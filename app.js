@@ -120,16 +120,17 @@ const cropOk = document.getElementById('crop-ok');
 const cropX = document.getElementById('crop-x');
 const CROP_ABORT = Symbol('abort');
 const CROP_MIN = 48; // 박스 최소 너비(화면 px)
+const CROP_PAD = 14; // 박스가 사진에 꽉 차도 모서리 핸들이 보이도록 사진 둘레 여백(px)
 
 // 사진 전체를 화면에 맞춰 보여 주고, 그 위 3:4 박스를 옮기거나 모서리로 크기 조절
 // 닫힐 때 확인이면 박스 영역의 data URL, 빼기면 null, X·Esc 면 CROP_ABORT
 function cropImage(bmp, i, n) {
   return new Promise((resolve) => {
-    const f = Math.min(Math.min(innerWidth * 0.8, 360) / bmp.width, (innerHeight * 0.6) / bmp.height);
+    const f = Math.min((Math.min(innerWidth * 0.8, 360) - 2 * CROP_PAD) / bmp.width, (innerHeight * 0.6) / bmp.height);
     const dw = bmp.width * f;
     const dh = bmp.height * f;
     const dpr = devicePixelRatio || 1;
-    Object.assign(cropStage.style, { width: `${dw}px`, height: `${dh}px` });
+    Object.assign(cropStage.style, { width: `${dw + 2 * CROP_PAD}px`, height: `${dh + 2 * CROP_PAD}px`, padding: `${CROP_PAD}px` });
     Object.assign(cropCv, { width: Math.round(dw * dpr), height: Math.round(dh * dpr) });
     cropCv.getContext('2d').drawImage(bmp, 0, 0, cropCv.width, cropCv.height);
 
@@ -138,12 +139,12 @@ function cropImage(bmp, i, n) {
     let h = (w * 4) / 3;
     let x = (dw - w) / 2;
     let y = (dh - h) / 2;
-    const paint = () => Object.assign(cropBox.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
+    const paint = () => Object.assign(cropBox.style, { left: `${x + CROP_PAD}px`, top: `${y + CROP_PAD}px`, width: `${w}px`, height: `${h}px` });
 
     const ac = new AbortController();
     const { signal } = ac;
     let drag = null;
-    const at = (e) => { const r = cropStage.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    const at = (e) => { const r = cropStage.getBoundingClientRect(); return [e.clientX - r.left - CROP_PAD, e.clientY - r.top - CROP_PAD]; };
     cropStage.addEventListener('pointerdown', (e) => {
       const corner = e.target.dataset?.h;
       if (!corner && !cropBox.contains(e.target)) return;
