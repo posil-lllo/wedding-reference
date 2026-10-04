@@ -322,18 +322,43 @@ tocEl.addEventListener('click', (e) => {
   document.querySelector(a.getAttribute('href')).scrollIntoView();
 });
 
+// iOS Safari 는 blob 다운로드 링크를 열지 못해 WebKitBlobResource 오류가 나므로 공유 시트로 저장
+const canShareFile = (file) => matchMedia('(pointer: coarse)').matches && navigator.canShare?.({ files: [file] });
+const downloadFile = (file) => {
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(file), download: file.name });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+};
+let pendingPdf = null; // 공유 시트는 탭 직후에만 열리므로, PDF 생성이 길어지면 한 번 더 탭해서 열기
+
 document.getElementById('pdf').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  if (pendingPdf) {
+    const file = pendingPdf;
+    pendingPdf = null;
+    btn.textContent = 'PDF 내보내기';
+    await navigator.share({ files: [file] }).catch((err) => err.name !== 'AbortError' && console.error('pdf share failed', err));
+    return;
+  }
   if (!window.jspdf || !window.html2canvas) {
     alert('PDF 도구를 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.');
     return;
   }
-  const btn = e.currentTarget;
   const overlay = document.getElementById('overlay');
   btn.disabled = true;
   overlay.hidden = false;
   try {
     const names = [state.basic.groom, state.basic.bride].filter(Boolean).join('_');
-    await exportPdf(deckEl, `웨딩촬영레퍼런스${names ? '_' + names : ''}.pdf`);
+    const file = await exportPdf(deckEl, `웨딩촬영레퍼런스${names ? '_' + names : ''}.pdf`);
+    if (!canShareFile(file)) return downloadFile(file);
+    try {
+      await navigator.share({ files: [file] });
+    } catch (err) {
+      if (err.name === 'NotAllowedError') {
+        pendingPdf = file;
+        btn.textContent = 'PDF 저장하기';
+      } else if (err.name !== 'AbortError') throw err;
+    }
   } catch (err) {
     console.error('pdf export failed', err);
     alert('PDF를 만들지 못했어요. 사진 수를 줄이거나 다시 시도해 주세요.');

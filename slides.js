@@ -149,7 +149,7 @@ async function exportPdf(deckEl, filename) {
       if (i) pdf.addPage([960, 540], 'landscape');
       pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 960, 540);
     }
-    pdf.save(filename);
+    return new File([pdf.output('blob')], filename, { type: 'application/pdf' });
   } finally {
     deckEl.classList.remove('exporting');
   }
