@@ -110,16 +110,61 @@ function scheduleSave() {
   }, SAVE_DELAY);
 }
 
-// ── 사진: 가운데 기준 3:4 로 잘라 JPEG data URL ──
-async function toThreeFour(file) {
-  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
-  const scale = Math.max(IMG_W / bmp.width, IMG_H / bmp.height);
-  const w = bmp.width * scale;
-  const h = bmp.height * scale;
-  const canvas = Object.assign(document.createElement('canvas'), { width: IMG_W, height: IMG_H });
-  canvas.getContext('2d').drawImage(bmp, (IMG_W - w) / 2, (IMG_H - h) / 2, w, h);
-  bmp.close();
-  return canvas.toDataURL('image/jpeg', 0.85);
+// ── 사진: 크롭 창에서 위치·확대를 정해 3:4 JPEG data URL 로 ──
+const cropDlg = document.getElementById('crop');
+const cropCv = document.getElementById('crop-cv');
+const cropZoom = document.getElementById('crop-zoom');
+const cropCount = document.getElementById('crop-count');
+
+// 닫힐 때 확인이면 data URL, 취소·Esc 면 null
+function cropImage(bmp, count) {
+  return new Promise((resolve) => {
+    const ctx = cropCv.getContext('2d');
+    const base = Math.max(IMG_W / bmp.width, IMG_H / bmp.height);
+    let zoom = 1;
+    const size = () => [bmp.width * base * zoom, bmp.height * base * zoom];
+    let [w, h] = size();
+    let x = (IMG_W - w) / 2;
+    let y = (IMG_H - h) / 2;
+    const draw = () => {
+      [w, h] = size();
+      x = Math.min(0, Math.max(IMG_W - w, x));
+      y = Math.min(0, Math.max(IMG_H - h, y));
+      ctx.drawImage(bmp, x, y, w, h);
+    };
+    const ac = new AbortController();
+    const { signal } = ac;
+    let last = null;
+    cropCv.addEventListener('pointerdown', (e) => { last = e; cropCv.setPointerCapture(e.pointerId); }, { signal });
+    cropCv.addEventListener('pointerup', () => { last = null; }, { signal });
+    cropCv.addEventListener('pointermove', (e) => {
+      if (!last) return;
+      const k = IMG_W / cropCv.clientWidth;
+      x += (e.clientX - last.clientX) * k;
+      y += (e.clientY - last.clientY) * k;
+      last = e;
+      draw();
+    }, { signal });
+    cropZoom.addEventListener('input', () => {
+      // 화면 가운데를 기준으로 확대
+      const fx = (IMG_W / 2 - x) / w;
+      const fy = (IMG_H / 2 - y) / h;
+      zoom = +cropZoom.value;
+      [w, h] = size();
+      x = IMG_W / 2 - fx * w;
+      y = IMG_H / 2 - fy * h;
+      draw();
+    }, { signal });
+    cropDlg.addEventListener('close', () => {
+      ac.abort();
+      resolve(cropDlg.returnValue === 'ok' ? cropCv.toDataURL('image/jpeg', 0.85) : null);
+    }, { signal });
+    cropZoom.value = '1';
+    cropCount.textContent = count;
+    cropDlg.returnValue = '';
+    draw();
+    cropDlg.showModal();
+  });
 }
 
 async function addImages(input) {
@@ -127,13 +172,22 @@ async function addImages(input) {
   const { imgPath } = input.dataset;
   input.value = '';
   if (!files.length) return;
-  setStatus('사진 처리 중…');
-  const results = await Promise.allSettled(files.map(toThreeFour));
-  const ok = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+  const ok = [];
+  let failed = 0;
+  for (const [i, file] of files.entries()) {
+    let bmp;
+    try {
+      bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    } catch {
+      failed += 1;
+      continue;
+    }
+    const url = await cropImage(bmp, files.length > 1 ? `${i + 1} / ${files.length}` : '');
+    bmp.close();
+    if (url) ok.push(url);
+  }
   if (ok.length) update(imgPath, [...get(imgPath), ...ok]);
-  else setStatus('');
   renderEditor();
-  const failed = results.length - ok.length;
   if (failed) alert(`${failed}장은 열 수 없는 형식이라 건너뛰었어요. (HEIC 사진이면 JPG로 바꿔서 올려 주세요)`);
 }
 
