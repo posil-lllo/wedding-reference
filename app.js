@@ -1,5 +1,4 @@
 // 입력 화면 렌더링, 상태 저장(IndexedDB), 색 설정, 탭 전환
-const DEFAULT_THEME = { bgmode: 'solid', ivory: '#f9f9f0', stripe: '#ecebdc', paper: '#fffefa', accent: '#accaec', accentText: '#6d93bd', onAccent: '#ffffff' };
 const emptyMu = () => ({ worry: '', want: '', dislike: [], like: [] });
 const DEFAULT_STATE = {
   basic: { date: '', groom: '', bride: '' },
@@ -9,9 +8,8 @@ const DEFAULT_STATE = {
   hair: { groom: [], bride: [] },
   dress: [],
   shots: [],
-  theme: DEFAULT_THEME,
+  pointColor: '#6d93bd',
 };
-const THEME_VARS = { ivory: '--ivory', stripe: '--stripe', paper: '--paper', accent: '--accent', accentText: '--accent-text', onAccent: '--on-accent' };
 const IMG_W = 900;
 const IMG_H = 1200;
 const SAVE_DELAY = 400;
@@ -186,7 +184,7 @@ function renderEditor() {
     ${muCard('groom', 'iii', '신랑')}${muCard('bride', 'iv', '신부')}
     ${hairCard('groom', 'v', '신랑')}${hairCard('bride', 'vi', '신부')}
     ${dressCard()}${shotCard()}
-    <div style="display:flex;justify-content:flex-end"><button class="btn" data-view="view">시안 완성하기 →</button></div>
+    <div style="display:flex;justify-content:space-between;gap:8px"><button class="btn danger" data-reset>전체 지우기</button><button class="btn" data-view="view">시안 완성하기 →</button></div>
   </div>`;
 }
 
@@ -217,55 +215,42 @@ editorEl.addEventListener('click', (e) => {
   } else if (del) {
     if (!confirm('이 항목을 삭제할까요?')) return;
     update(del, get(del).filter((_, j) => j !== +i));
+  } else if ('reset' in b.dataset) {
+    if (!confirm('입력한 내용과 사진을 모두 지울까요?')) return;
+    state = { ...DEFAULT_STATE, pointColor: state.pointColor };
   } else if (rmImg) {
     update(rmImg, i === undefined ? '' : get(rmImg).filter((_, j) => j !== +i));
   } else return;
+  if ('reset' in b.dataset) scheduleSave();
   renderEditor();
 });
 
-// ── 색 설정 ──
-const root = document.documentElement;
+// ── 결과 슬라이드 포인트 컬러 (슬라이드에만 적용) ──
 const parseHex = (raw) => {
   const v = raw.trim().replace(/^#?/, '#').toLowerCase();
   if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/.test(v)) return null;
   return v.length === 4 ? '#' + [...v.slice(1)].map((c) => c + c).join('') : v;
 };
-function applyTheme(t) {
-  Object.entries(THEME_VARS).forEach(([k, cssVar]) => root.style.setProperty(cssVar, t[k]));
-  root.dataset.bg = t.bgmode;
-  document.getElementById('stripe-pick').hidden = t.bgmode !== 'stripe';
-  document.querySelectorAll('input[name="bgmode"]').forEach((r) => { r.checked = r.value === t.bgmode; });
-  document.querySelectorAll('[data-theme]').forEach((c) => { c.value = t[c.dataset.theme]; });
-  document.querySelectorAll('[data-hex]').forEach((h) => {
-    if (h !== document.activeElement) h.value = t[h.dataset.hex];
-  });
+const pointPicker = document.getElementById('point-color');
+const pointHex = document.getElementById('point-hex');
+function applyPointColor(c) {
+  document.getElementById('deck').style.setProperty('--accent-text', c);
+  pointPicker.value = c;
+  if (pointHex !== document.activeElement) pointHex.value = c;
 }
-function setTheme(key, value) {
-  update(`theme.${key}`, value);
-  applyTheme(state.theme);
+function setPointColor(c) {
+  update('pointColor', c);
+  applyPointColor(c);
 }
-const settings = document.querySelector('.settings-panel');
-settings.addEventListener('input', (e) => {
-  const t = e.target;
-  if (t.dataset.theme) return setTheme(t.dataset.theme, t.value);
-  if (!t.dataset.hex) return;
-  const hex = parseHex(t.value); // 'fffcef', '#fffcef', 'fc0' 모두 받음
-  t.setAttribute('aria-invalid', String(!hex));
-  if (hex) setTheme(t.dataset.hex, hex);
+pointPicker.addEventListener('input', () => setPointColor(pointPicker.value));
+pointHex.addEventListener('input', () => {
+  const hex = parseHex(pointHex.value); // 'fffcef', '#fffcef', 'fc0' 모두 받음
+  pointHex.setAttribute('aria-invalid', String(!hex));
+  if (hex) setPointColor(hex);
 });
-settings.addEventListener('focusout', (e) => {
-  if (!e.target.dataset.hex) return;
-  e.target.value = state.theme[e.target.dataset.hex];
-  e.target.removeAttribute('aria-invalid');
-});
-settings.addEventListener('change', (e) => {
-  if (e.target.name === 'bgmode') setTheme('bgmode', e.target.value);
-});
-document.getElementById('reset').addEventListener('click', () => {
-  if (!confirm('입력한 내용과 사진을 모두 지울까요? (색 설정은 유지)')) return;
-  state = { ...DEFAULT_STATE, theme: state.theme };
-  scheduleSave();
-  renderEditor();
+pointHex.addEventListener('blur', () => {
+  pointHex.value = state.pointColor;
+  pointHex.removeAttribute('aria-invalid');
 });
 
 // ── 탭 · 결과 ──
@@ -312,6 +297,6 @@ document.getElementById('pdf').addEventListener('click', async (e) => {
     console.error('load failed', e);
     setStatus('저장된 내용을 불러오지 못했어요', true);
   }
-  applyTheme(state.theme);
+  applyPointColor(state.pointColor);
   renderEditor();
 })();

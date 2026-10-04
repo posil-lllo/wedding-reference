@@ -2,13 +2,11 @@
 :root {
   --paper: #fffefa;
   --ivory: #f9f9f0;
-  --stripe: #ecebdc;
   --line: #eae7dc;
   --ink: #3a3d44;
   --muted: #8a8d93;
   --accent: #accaec;
   --accent-text: #6d93bd;
-  --on-accent: #ffffff;
   --like: #7d9a7a;
   --dislike: #b88378;
   --script: "Pinyon Script", "Snell Roundhand", cursive;
@@ -18,14 +16,6 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--ivory); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.6; }
-/* 스트라이프 모드: 배경색 위에 줄 색으로 세로 줄무늬 (슬라이드 밖이라 color-mix 사용 가능) */
-:root[data-bg="stripe"] body { background:
-  repeating-linear-gradient(90deg,
-    transparent 0 10px, var(--stripe) 10px 11px,
-    transparent 11px 18px, color-mix(in srgb, var(--stripe) 55%, transparent) 18px 30px,
-    transparent 30px 37px, var(--stripe) 37px 38px,
-    transparent 38px 48px),
-  var(--ivory); }
 h1, h2, h3 { font-family: var(--serif); font-weight: 700; text-wrap: balance; margin: 0; }
 button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
@@ -43,17 +33,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .tab { border: 0; background: none; padding: 6px 14px; border-radius: 999px; cursor: pointer; color: var(--muted); }
 .tab[aria-selected="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
 
-.settings { position: relative; }
-.settings summary { list-style: none; cursor: pointer; font-size: 13px; color: var(--accent-text); padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; }
-.settings summary::-webkit-details-marker { display: none; }
-.settings-panel { position: absolute; right: 0; top: calc(100% + 6px); width: min(300px, calc(100vw - 32px)); background: var(--paper); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgb(60 80 110 / .12); padding: 14px; display: grid; gap: 10px; }
-.bgpick { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.bgpick { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .bgpick input[type="color"] { width: 28px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
 .bgpick .hex { width: 7.5em; padding: 3px 6px; border: 1px solid var(--line); border-radius: 4px; background: #fff; font: 12px ui-monospace, Menlo, monospace; color: var(--ink); }
 .bgpick .hex[aria-invalid="true"] { border-color: var(--dislike); }
-.settings-panel hr { border: 0; border-top: 1px dashed var(--line); margin: 2px 0; width: 100%; }
 
-.btn { border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); padding: 7px 16px; border-radius: 6px; cursor: pointer; }
+.btn { border: 1px solid var(--accent); background: var(--accent); color: #fff; padding: 7px 16px; border-radius: 6px; cursor: pointer; }
 .btn:disabled { opacity: .6; cursor: progress; }
 .btn.ghost { background: transparent; color: var(--accent-text); }
 .btn.dashed { width: 100%; border-style: dashed; background: transparent; color: var(--accent-text); padding: 12px; }
@@ -81,9 +66,8 @@ textarea.in { min-height: 64px; resize: vertical; }
 .seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #fff; }
 .seg label { padding: 8px 10px; text-align: center; cursor: pointer; font-size: 13px; position: relative; }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
-.seg label:has(input:checked) { background: var(--accent); color: var(--on-accent); }
+.seg label:has(input:checked) { background: var(--accent); color: #fff; }
 .seg label:has(input:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: -2px; }
-.settings .seg label { padding: 4px 10px; font-size: 12px; }
 
 .drop { border: 1px dashed var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 8px; background: #fff; }
 .drop .lbl { font-size: 12px; font-weight: 500; }
