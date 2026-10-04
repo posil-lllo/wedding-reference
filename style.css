@@ -77,7 +77,9 @@ textarea.in { min-height: 64px; resize: vertical; }
 .seg label { padding: 8px 10px; text-align: center; cursor: pointer; font-size: 13px; position: relative; }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
 .seg label:has(input:checked) { background: var(--accent); color: #fff; }
-.card > header .seg.kind { margin-left: auto; align-self: center; width: 150px; }
+.card > header .seg.kind { margin-left: auto; align-self: center; display: flex; gap: 4px; padding: 4px; border: 0; border-radius: 999px; background: var(--ivory); font-family: var(--sans); }
+.seg.kind label { padding: 4px 12px; border-radius: 999px; font-size: 12px; color: var(--muted); }
+.seg.kind label:has(input:checked) { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
 .seg label:has(input:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: -2px; }
 
 .drop { border: 1px dashed var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 8px; background: #fff; }
