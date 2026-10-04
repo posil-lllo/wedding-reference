@@ -1,5 +1,5 @@
 // 입력 화면 렌더링, 상태 저장(IndexedDB), 색 설정, 탭 전환
-const emptyMu = () => ({ worry: '', want: '', dislike: [], like: [] });
+const emptyMu = () => ({ worry: '', likeDesc: '', dislikeDesc: '', dislike: [], like: [] });
 const DEFAULT_STATE = {
   basic: { date: '', groom: '', bride: '' },
   studio: { kind: '스튜디오', name: '', link: '', total: '토탈', start: '', end: '' },
@@ -49,6 +49,13 @@ const hairToImgs = (s) => ({
   ...s,
   hair: Object.fromEntries(Object.entries(s.hair).map(([side, list]) => [side, list.map(({ img, ...h }) => ({ ...h, imgs: h.imgs ?? (img ? [img] : []) }))])),
 });
+
+// 예전 저장본의 '원하는 느낌'은 좋아요 설명으로 옮김
+// merge 전에 적용해야 함 (merge 는 DEFAULT_STATE 에 없는 키를 버림)
+const wantToLikeDesc = (s) => (s.mu ? {
+  ...s,
+  mu: Object.fromEntries(Object.entries(s.mu).map(([side, { want, ...m }]) => [side, { ...m, likeDesc: m.likeDesc || want || '' }])),
+} : s);
 
 let state = withOneEach(DEFAULT_STATE);
 const get = (path) => getIn(state, path);
@@ -140,8 +147,9 @@ const addBtn = (path) =>
 const thumb = (src, path, i) =>
   `<div class="thumb"><img src="${src}" alt=""><button class="x" data-rm-img="${path}" data-i="${i}" aria-label="사진 삭제">✕</button></div>`;
 const thumbs = (path) => `<div class="thumbs">${get(path).map((src, i) => thumb(src, path, i)).join('')}${addBtn(path)}</div>`;
-const drop = (path, kind, label) => `<div class="drop ${kind}"><span class="lbl">${label}</span>${thumbs(path)}</div>`;
-const likePair = (base) => `<div class="pair">${drop(`${base}.like`, 'like', '좋아요')}${drop(`${base}.dislike`, 'dislike', '싫어요 <span class="opt">(선택)</span>')}</div>`;
+const descArea = (path) => `<textarea class="in" data-path="${path}" placeholder="설명" aria-label="설명">${esc(get(path))}</textarea>`;
+const drop = (path, kind, label, descPath) => `<div class="drop ${kind}"><span class="lbl">${label}</span>${thumbs(path)}${descPath ? descArea(descPath) : ''}</div>`;
+const likePair = (base, hasDesc = false) => `<div class="pair">${drop(`${base}.like`, 'like', '좋아요', hasDesc && `${base}.likeDesc`)}${drop(`${base}.dislike`, 'dislike', '싫어요 <span class="opt">(선택)</span>', hasDesc && `${base}.dislikeDesc`)}</div>`;
 const card = (id, no, title, body, aside = '') =>
   `<section class="card" id="${id}"><header><span class="no">${no}</span><h2>${title}</h2>${aside}</header>${body}</section>`;
 const delBtn = (list, i) => `<button class="del" data-del="${list}" data-i="${i}" aria-label="삭제">✕</button>`;
@@ -175,8 +183,8 @@ function scheduleCard() {
 }
 
 const muCard = (side, no, label) => card(`s-mu-${side}`, no, `메이크업 시안 · ${label}`, `
-  <div class="pair">${area(`mu.${side}.worry`, '고민인 부분')}${area(`mu.${side}.want`, '원하는 느낌')}</div>
-  ${likePair(`mu.${side}`)}`);
+  ${area(`mu.${side}.worry`, '고민인 부분')}
+  ${likePair(`mu.${side}`, true)}`);
 
 function hairCard(side, no, label) {
   const items = get(`hair.${side}`).map((h, i) => {
@@ -339,7 +347,7 @@ document.getElementById('pdf').addEventListener('click', async (e) => {
 (async () => {
   try {
     const saved = await idb('readonly', (s) => s.get('current'));
-    if (saved) state = withOneEach(hairToImgs(merge(DEFAULT_STATE, saved)));
+    if (saved) state = withOneEach(hairToImgs(merge(DEFAULT_STATE, wantToLikeDesc(saved))));
   } catch (e) {
     console.error('load failed', e);
     setStatus('저장된 내용을 불러오지 못했어요', true);

@@ -70,7 +70,7 @@ function makeupSlide(mu, who) {
   const hasImgs = mu.like.length || mu.dislike.length;
   const textW = hasImgs ? 26 : BODY_W;
   const block = (label, v) => (v ? `<div><div class="s-lbl">${label}</div><div class="s-txt">${nl(v)}</div></div>` : '');
-  const text = mu.worry || mu.want ? `<div class="s-text" style="width:${textW}cqw">${block('고민인 부분', mu.worry)}${block('원하는 느낌', mu.want)}</div>` : '';
+  const text = mu.worry || mu.likeDesc || mu.dislikeDesc ? `<div class="s-text" style="width:${textW}cqw">${block('고민인 부분', mu.worry)}${block('좋아요', mu.likeDesc)}${block('싫어요', mu.dislikeDesc)}</div>` : '';
   const right = BODY_W - (text ? textW + GAP : 0);
   return titled('Makeup', '메이크업 시안', who, text + likeDislike(mu.like, mu.dislike, right));
 }
@@ -116,7 +116,7 @@ function buildSlides(s) {
   const people = [['bride', '신부', s.basic.bride], ['groom', '신랑', s.basic.groom]];
   for (const [side, label, name] of people) {
     const mu = s.mu[side];
-    if (mu.worry || mu.want || mu.like.length || mu.dislike.length) {
+    if (mu.worry || mu.likeDesc || mu.dislikeDesc || mu.like.length || mu.dislike.length) {
       slides.push({ cap: `메이크업 · ${label}`, html: makeupSlide(mu, `${label} ${name}`.trim()) });
     }
   }
