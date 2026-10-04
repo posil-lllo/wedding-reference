@@ -16,7 +16,7 @@ const SAVE_DELAY = 400;
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const NEW_ITEM = {
-  hair: () => ({ id: uid(), img: '', name: '', desc: '' }),
+  hair: () => ({ id: uid(), imgs: [], name: '', desc: '' }),
   dress: () => ({ id: uid(), imgs: [], name: '', desc: '' }),
   shots: () => ({ id: uid(), name: '', hair: '', place: '', dress: '', dislike: [], like: [] }),
 };
@@ -39,6 +39,12 @@ const newItem = (list) => NEW_ITEM[list.split('.')[0]]();
 const isBlank = (x) => Object.entries(x).every(([k, v]) => k === 'id' || (Array.isArray(v) ? !v.length : !v));
 const withOneEach = (s) => LISTS.reduce((acc, p) => (getIn(acc, p).length ? acc : setIn(acc, toPath(p), [newItem(p)])), s);
 const withoutBlanks = (s) => LISTS.reduce((acc, p) => setIn(acc, toPath(p), getIn(acc, p).filter((x) => !isBlank(x))), s);
+
+// 예전 저장본은 헤어 사진이 img 한 장이었음
+const hairToImgs = (s) => ({
+  ...s,
+  hair: Object.fromEntries(Object.entries(s.hair).map(([side, list]) => [side, list.map(({ img, ...h }) => ({ ...h, imgs: h.imgs ?? (img ? [img] : []) }))])),
+});
 
 let state = withOneEach(DEFAULT_STATE);
 const get = (path) => getIn(state, path);
@@ -107,13 +113,13 @@ async function toThreeFour(file) {
 
 async function addImages(input) {
   const files = [...input.files];
-  const { imgPath, mode } = input.dataset;
+  const { imgPath } = input.dataset;
   input.value = '';
   if (!files.length) return;
   setStatus('사진 처리 중…');
   const results = await Promise.allSettled(files.map(toThreeFour));
   const ok = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
-  if (ok.length) update(imgPath, mode === 'one' ? ok[0] : [...get(imgPath), ...ok]);
+  if (ok.length) update(imgPath, [...get(imgPath), ...ok]);
   else setStatus('');
   renderEditor();
   const failed = results.length - ok.length;
@@ -125,10 +131,10 @@ const input = (path, label, type = 'text', extra = '') =>
   `<label class="f"><span>${label}</span><input class="in" type="${type}" data-path="${path}" value="${esc(get(path))}" ${extra}></label>`;
 const area = (path, label) => `<label class="f">${label}<textarea class="in" data-path="${path}">${esc(get(path))}</textarea></label>`;
 const bare = (path, ph) => `<input class="in" data-path="${path}" value="${esc(get(path))}" placeholder="${ph}" aria-label="${ph}">`;
-const addBtn = (path, one = false) =>
-  `<label class="add-img">+<input type="file" accept="image/*" ${one ? 'data-mode="one"' : 'multiple'} data-img-path="${path}" aria-label="사진 추가"></label>`;
+const addBtn = (path) =>
+  `<label class="add-img">+<input type="file" accept="image/*" multiple data-img-path="${path}" aria-label="사진 추가"></label>`;
 const thumb = (src, path, i) =>
-  `<div class="thumb"><img src="${src}" alt=""><button class="x" data-rm-img="${path}" ${i === undefined ? '' : `data-i="${i}"`} aria-label="사진 삭제">✕</button></div>`;
+  `<div class="thumb"><img src="${src}" alt=""><button class="x" data-rm-img="${path}" data-i="${i}" aria-label="사진 삭제">✕</button></div>`;
 const thumbs = (path) => `<div class="thumbs">${get(path).map((src, i) => thumb(src, path, i)).join('')}${addBtn(path)}</div>`;
 const drop = (path, kind, label) => `<div class="drop ${kind}"><span class="lbl">${label}</span>${thumbs(path)}</div>`;
 const likePair = (base) => `<div class="pair">${drop(`${base}.dislike`, 'dislike', '싫어요')}${drop(`${base}.like`, 'like', '좋아요')}</div>`;
@@ -168,9 +174,8 @@ const muCard = (side, no, label) => card(`s-mu-${side}`, no, `메이크업 시�
 function hairCard(side, no, label) {
   const items = get(`hair.${side}`).map((h, i) => {
     const p = `hair.${side}.${i}`;
-    return `<div class="item">
-      <div class="thumbs one">${h.img ? thumb(h.img, `${p}.img`) : addBtn(`${p}.img`, true)}</div>
-      <div class="fields">${bare(`${p}.name`, '이름')}<textarea class="in" data-path="${p}.desc" placeholder="설명" aria-label="설명">${esc(h.desc)}</textarea></div>
+    return `<div class="item wide">
+      <div class="fields">${thumbs(`${p}.imgs`)}${bare(`${p}.name`, '이름')}<textarea class="in" data-path="${p}.desc" placeholder="설명" aria-label="설명">${esc(h.desc)}</textarea></div>
       ${delBtn(`hair.${side}`, i)}</div>`;
   }).join('');
   return card(`s-hair-${side}`, no, `헤어 시안 · ${label}`, `${items}<button class="btn dashed" data-add="hair.${side}">+ 헤어 추가</button>`);
@@ -239,7 +244,7 @@ editorEl.addEventListener('click', (e) => {
     if (!confirm('입력한 내용과 사진을 모두 지울까요?')) return;
     state = withOneEach({ ...DEFAULT_STATE, pointColor: state.pointColor });
   } else if (rmImg) {
-    update(rmImg, i === undefined ? '' : get(rmImg).filter((_, j) => j !== +i));
+    update(rmImg, get(rmImg).filter((_, j) => j !== +i));
   } else return;
   if ('reset' in b.dataset) scheduleSave();
   renderEditor();
@@ -313,7 +318,7 @@ document.getElementById('pdf').addEventListener('click', async (e) => {
 (async () => {
   try {
     const saved = await idb('readonly', (s) => s.get('current'));
-    if (saved) state = withOneEach(merge(DEFAULT_STATE, saved));
+    if (saved) state = withOneEach(hairToImgs(merge(DEFAULT_STATE, saved)));
   } catch (e) {
     console.error('load failed', e);
     setStatus('저장된 내용을 불러오지 못했어요', true);

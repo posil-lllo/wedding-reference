@@ -75,7 +75,7 @@ function makeupSlide(mu, who) {
 function hairSlide(items, who) {
   const w = (BODY_W - GAP * (HAIR_PER_SLIDE - 1)) / HAIR_PER_SLIDE;
   const cards = items.map((h) => `<div class="hcard" style="width:${w}cqw">
-    ${h.img ? `<img class="tile" src="${h.img}" alt="">` : '<div class="tile empty"></div>'}
+    ${h.imgs.length ? collage(h.imgs, w, BODY_H - 7, '', '') : '<div class="tile empty"></div>'}
     <div class="nm">${esc(h.name)}</div><div class="ds">${nl(h.desc)}</div>
   </div>`);
   return titled('Hair', '헤어 시안', who, cards.join(''));
@@ -95,7 +95,7 @@ function shotSlide(shot, i, s) {
   const dress = s.dress.find((d) => d.id === shot.dress);
   const meta = [
     shot.place && `<div><dt>장소</dt><dd>${esc(shot.place)}</dd></div>`,
-    hair && `<div><dt>헤어</dt><dd>${esc(hair.name)}</dd>${hair.img ? `<div class="mini"><img class="tile" src="${hair.img}" alt=""></div>` : ''}</div>`,
+    hair && `<div><dt>헤어</dt><dd>${esc(hair.name)}</dd><div class="mini">${hair.imgs.slice(0, 3).map((src) => `<img class="tile" src="${src}" alt="">`).join('')}</div></div>`,
     dress && `<div><dt>드레스</dt><dd>${esc(dress.name)}</dd><div class="mini">${dress.imgs.slice(0, 3).map((src) => `<img class="tile" src="${src}" alt="">`).join('')}</div></div>`,
   ].filter(Boolean);
   const metaW = 18;
