@@ -96,7 +96,9 @@ textarea.in { min-height: 64px; resize: vertical; }
 .add-img:has(input:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: 2px; }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .grid.two { grid-template-columns: 1fr 1fr; }
-.grid.sched > :nth-last-child(2) { grid-column-start: 1; }
+/* 일정: 이름·(방식|작가|선생님) / 링크 / 시작·종료 */
+.grid.sched { grid-template-columns: 1fr 1fr; }
+.grid.sched > :nth-last-child(3) { grid-column: 1 / -1; }
 
 .item { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; background: #fff; }
 .item.wide { grid-template-columns: minmax(0, 1fr) auto; }
@@ -174,8 +176,7 @@ textarea.in { min-height: 64px; resize: vertical; }
 
 @media (max-width: 760px) {
   .grid.basic { grid-template-columns: 1fr; }
-  /* 일정: 이름·방식(링크)은 한 줄씩, 시작·종료 시간은 반씩 나란히 */
-  .grid.sched { grid-template-columns: 1fr 1fr; }
+  /* 일정: 시작·종료 시간만 반씩 나란히, 나머지는 한 줄씩 */
   .grid.sched > :nth-last-child(n+3) { grid-column: 1 / -1; }
   .brand { flex-basis: 100%; }
   .pair { grid-template-columns: 1fr; }

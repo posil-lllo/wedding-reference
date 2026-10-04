@@ -2,7 +2,7 @@
 const emptyMu = () => ({ worry: '', likeDesc: '', dislikeDesc: '', dislike: [], like: [] });
 const DEFAULT_STATE = {
   basic: { date: '', groom: '', bride: '' },
-  studio: { kind: '스튜디오', name: '', link: '', total: '토탈', start: '', end: '' },
+  studio: { kind: '스튜디오', name: '', photographer: '', link: '', total: '토탈', start: '', end: '' },
   makeup: { name: '', teacher: '', link: '', start: '', end: '' },
   mu: { groom: emptyMu(), bride: emptyMu() },
   hair: { groom: [], bride: [] },
@@ -173,10 +173,12 @@ const seg = (path, values, label, cls = '') => `<div class="seg ${cls}" role="ra
 
 function scheduleCard() {
   const isSnap = get('studio.kind') === '스냅';
-  const total = isSnap ? '' : `<div class="f">진행 방식${seg('studio.total', ['토탈', '비토탈'], '진행 방식')}</div>`;
+  const second = isSnap
+    ? input('studio.photographer', '작가님 이름')
+    : `<div class="f">진행 방식${seg('studio.total', ['토탈', '비토탈'], '진행 방식')}</div>`;
   return card('s-sched', 'ii', '일정', `
     <div class="sub">${isSnap ? '스냅' : '스튜디오'}</div>
-    <div class="grid sched">${input('studio.name', isSnap ? '스냅 업체 이름' : '스튜디오 이름')}${input('studio.link', '링크 <span class="opt">(선택)</span>', 'url', 'placeholder="https://"')}${total}${input('studio.start', '시작 시간', 'time')}${input('studio.end', '종료 시간', 'time')}</div>
+    <div class="grid sched">${input('studio.name', isSnap ? '스냅 업체 이름' : '스튜디오 이름')}${second}${input('studio.link', '링크 <span class="opt">(선택)</span>', 'url', 'placeholder="https://"')}${input('studio.start', '시작 시간', 'time')}${input('studio.end', '종료 시간', 'time')}</div>
     <div class="sub">메이크업샵</div>
     <div class="grid sched">${input('makeup.name', '메이크업샵 이름')}${input('makeup.teacher', '메이크업 선생님')}${input('makeup.link', '링크 <span class="opt">(선택)</span>', 'url', 'placeholder="https://"')}${input('makeup.start', '시작 시간', 'time')}${input('makeup.end', '종료 시간', 'time')}</div>`,
   seg('studio.kind', ['스튜디오', '스냅'], '촬영 방식', 'kind'));
