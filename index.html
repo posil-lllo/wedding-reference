@@ -12,7 +12,17 @@
 <body>
 <div class="top"><div class="top-in">
   <div class="brand">Our Wedding Shoot <small>촬영 시안 만들기</small></div>
-  <span class="status" id="status" role="status"></span>
+  <span class="status" id="status" role="status"></span><button class="info" id="save-info" popovertarget="save-help" aria-label="임시 저장 실패 안내" hidden>i</button>
+  <div class="help" id="save-help" popover>
+    <b>임시 저장이 안 된 상태예요</b>
+    <p>입력한 내용은 서버가 아니라 이 기기의 브라우저 안에만 임시로 저장돼요. 브라우저가 저장을 거부하면 이 문구가 떠요.</p>
+    <p>지금 화면의 내용은 그대로 있지만, 새로고침하거나 창을 닫으면 사라질 수 있어요.</p>
+    <ul>
+      <li>먼저 <b>PDF 내보내기</b>로 받아 두세요.</li>
+      <li>사파리·크롬 일반 창에서 주소를 직접 열어 주세요. 카카오톡 등 앱 안 브라우저나 개인정보 보호 모드는 저장이 막힐 수 있어요.</li>
+      <li>기기 저장 공간이 부족하지 않은지 확인해 주세요.</li>
+    </ul>
+  </div>
   <div class="top-r">
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" aria-selected="true" data-view="edit">입력</button>

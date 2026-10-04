@@ -69,6 +69,7 @@ const statusEl = document.getElementById('status');
 const setStatus = (msg, isErr = false) => {
   statusEl.textContent = msg;
   statusEl.classList.toggle('err', isErr);
+  document.getElementById('save-info').hidden = !isErr;
 };
 let saveTimer;
 function scheduleSave() {
@@ -80,7 +81,7 @@ function scheduleSave() {
       setStatus('저장됨');
     } catch (e) {
       console.error('save failed', e);
-      setStatus(`저장 실패 (${e?.name || e}) — 브라우저 저장 공간을 확인해 주세요`, true);
+      setStatus(`임시 저장 실패 (${e?.name || e})`, true);
     }
   }, SAVE_DELAY);
 }

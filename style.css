@@ -28,6 +28,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .brand small { font-family: var(--serif); font-size: 13px; color: var(--muted); margin-left: 6px; }
 .status { font-size: 12px; color: var(--muted); }
 .status.err { color: var(--dislike); }
+.info { margin-left: -6px; width: 18px; height: 18px; padding: 0; border: 1px solid var(--muted); border-radius: 50%; background: none; color: var(--muted); font: italic 700 11px/1 Georgia, serif; cursor: pointer; flex: none; }
+.help { max-width: min(360px, calc(100vw - 32px)); padding: 16px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); font-size: 13px; line-height: 1.6; box-shadow: 0 8px 24px rgb(0 0 0 / .12); }
+.help::backdrop { background: rgb(0 0 0 / .15); }
+.help p, .help ul { margin: 8px 0 0; }
+.help ul { padding-left: 18px; }
 .top-r { margin-left: auto; display: flex; gap: 10px; align-items: center; }
 .tabs { display: flex; gap: 4px; background: var(--ivory); border-radius: 999px; padding: 4px; }
 .tab { border: 0; background: none; padding: 6px 14px; border-radius: 999px; cursor: pointer; color: var(--muted); }
