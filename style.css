@@ -75,6 +75,7 @@ textarea.in { min-height: 64px; resize: vertical; }
 .seg label { padding: 8px 10px; text-align: center; cursor: pointer; font-size: 13px; position: relative; }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
 .seg label:has(input:checked) { background: var(--accent); color: #fff; }
+.card > header .seg.kind { margin-left: auto; align-self: center; width: 150px; }
 .seg label:has(input:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: -2px; }
 
 .drop { border: 1px dashed var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 8px; background: #fff; }
@@ -156,6 +157,7 @@ textarea.in { min-height: 64px; resize: vertical; }
 .hcard .nm { font-family: var(--serif); font-weight: 700; font-size: 1.5cqw; }
 .hcard .ds { font-size: 1.15cqw; color: var(--muted); line-height: 1.5; }
 .meta { display: grid; gap: 1.6cqw; align-content: start; margin: 0; flex: none; }
+.meta.two { grid-template-columns: 1fr 1fr; column-gap: 1.6cqw; }
 .meta dt { font-size: 1.1cqw; letter-spacing: .08em; color: var(--muted); }
 .meta dd { margin: .2cqw 0 0; font-family: var(--serif); font-size: 1.6cqw; }
 .meta .mini { display: flex; gap: .5cqw; margin-top: .6cqw; }

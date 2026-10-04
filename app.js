@@ -2,11 +2,13 @@
 const emptyMu = () => ({ worry: '', want: '', dislike: [], like: [] });
 const DEFAULT_STATE = {
   basic: { date: '', groom: '', bride: '' },
-  studio: { name: '', total: '토탈', start: '', end: '' },
+  studio: { kind: '스튜디오', name: '', total: '토탈', start: '', end: '' },
   makeup: { name: '', teacher: '', link: '', start: '', end: '' },
   mu: { groom: emptyMu(), bride: emptyMu() },
   hair: { groom: [], bride: [] },
   dress: [],
+  bouquet: [],
+  boutonniere: [],
   shots: [],
   pointColor: '#6d93bd',
 };
@@ -18,7 +20,9 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const NEW_ITEM = {
   hair: () => ({ id: uid(), imgs: [], name: '', desc: '' }),
   dress: () => ({ id: uid(), imgs: [], name: '', desc: '' }),
-  shots: () => ({ id: uid(), name: '', hair: '', place: '', dress: '', dislike: [], like: [] }),
+  bouquet: () => ({ id: uid(), imgs: [], name: '', desc: '' }),
+  boutonniere: () => ({ id: uid(), imgs: [], name: '', desc: '' }),
+  shots: () => ({ id: uid(), name: '', hair: '', place: '', dress: '', bouquet: '', boutonniere: '', dislike: [], like: [] }),
 };
 
 // ── 불변 경로 갱신 ──
@@ -34,7 +38,7 @@ const merge = (d, s) => (d && typeof d === 'object' && !Array.isArray(d) && s &&
   : s ?? d);
 
 // 목록은 늘 칸 1개 이상 보이게 하고, 빈 칸은 결과·선택지에서 뺌
-const LISTS = ['hair.bride', 'hair.groom', 'dress', 'shots'];
+const LISTS = ['hair.bride', 'hair.groom', 'dress', 'bouquet', 'boutonniere', 'shots'];
 const newItem = (list) => NEW_ITEM[list.split('.')[0]]();
 const isBlank = (x) => Object.entries(x).every(([k, v]) => k === 'id' || (Array.isArray(v) ? !v.length : !v));
 const withOneEach = (s) => LISTS.reduce((acc, p) => (getIn(acc, p).length ? acc : setIn(acc, toPath(p), [newItem(p)])), s);
@@ -138,8 +142,8 @@ const thumb = (src, path, i) =>
 const thumbs = (path) => `<div class="thumbs">${get(path).map((src, i) => thumb(src, path, i)).join('')}${addBtn(path)}</div>`;
 const drop = (path, kind, label) => `<div class="drop ${kind}"><span class="lbl">${label}</span>${thumbs(path)}</div>`;
 const likePair = (base) => `<div class="pair">${drop(`${base}.dislike`, 'dislike', '싫어요')}${drop(`${base}.like`, 'like', '좋아요')}</div>`;
-const card = (id, no, title, body, note = '') =>
-  `<section class="card" id="${id}"><header><span class="no">${no}</span><h2>${title}</h2>${note ? `<span class="note">${note}</span>` : ''}</header>${body}</section>`;
+const card = (id, no, title, body, aside = '') =>
+  `<section class="card" id="${id}"><header><span class="no">${no}</span><h2>${title}</h2>${aside}</header>${body}</section>`;
 const delBtn = (list, i) => `<button class="del" data-del="${list}" data-i="${i}" aria-label="삭제">✕</button>`;
 const option = (value, label, sel) => `<option value="${esc(value)}"${value === sel ? ' selected' : ''}>${esc(label)}</option>`;
 
@@ -147,8 +151,8 @@ const hairOptions = (sel) => '<option value="">선택 안 함</option>' + [['bri
   .filter(([side]) => state.hair[side].some((h) => !isBlank(h)))
   .map(([side, label]) => `<optgroup label="${label}">${state.hair[side].filter((h) => !isBlank(h)).map((h) => option(h.id, h.name || '(이름 없음)', sel)).join('')}</optgroup>`)
   .join('');
-const dressOptions = (sel) => '<option value="">선택 안 함</option>' + state.dress.filter((d) => !isBlank(d)).map((d) => option(d.id, d.name || '(이름 없음)', sel)).join('');
-const OPTIONS = { hair: hairOptions, dress: dressOptions };
+const listOptions = (key) => (sel) => '<option value="">선택 안 함</option>' + state[key].filter((d) => !isBlank(d)).map((d) => option(d.id, d.name || '(이름 없음)', sel)).join('');
+const OPTIONS = { hair: hairOptions, dress: listOptions('dress'), bouquet: listOptions('bouquet'), boutonniere: listOptions('boutonniere') };
 const select = (path, label, kind) =>
   `<label class="f">${label}<select class="in" data-path="${path}" data-opts="${kind}">${OPTIONS[kind](get(path))}</select></label>`;
 
@@ -156,15 +160,18 @@ function basicCard() {
   return card('s-basic', 'i', '기본정보', `<div class="grid basic">${input('basic.date', '촬영 날짜', 'date')}${input('basic.groom', '신랑 이름')}${input('basic.bride', '신부 이름')}</div>`);
 }
 
+const seg = (path, values, label, cls = '') => `<div class="seg ${cls}" role="radiogroup" aria-label="${label}">${values
+  .map((v) => `<label><input type="radio" name="${path}" value="${v}" data-path="${path}"${v === get(path) ? ' checked' : ''}>${v}</label>`).join('')}</div>`;
+
 function scheduleCard() {
-  const total = get('studio.total');
-  const seg = `<div class="f">진행 방식<div class="seg" role="radiogroup" aria-label="진행 방식">${['토탈', '비토탈']
-    .map((v) => `<label><input type="radio" name="total" value="${v}" data-path="studio.total"${v === total ? ' checked' : ''}>${v}</label>`).join('')}</div></div>`;
+  const isSnap = get('studio.kind') === '스냅';
+  const total = isSnap ? '' : `<div class="f">진행 방식${seg('studio.total', ['토탈', '비토탈'], '진행 방식')}</div>`;
   return card('s-sched', 'ii', '일정', `
-    <div class="sub">스튜디오</div>
-    <div class="grid sched">${input('studio.name', '스튜디오 이름')}${seg}${input('studio.start', '시작 시간', 'time')}${input('studio.end', '종료 시간', 'time')}</div>
+    <div class="sub">${isSnap ? '스냅' : '스튜디오'}</div>
+    <div class="grid sched">${input('studio.name', isSnap ? '스냅 업체 이름' : '스튜디오 이름')}${total}${input('studio.start', '시작 시간', 'time')}${input('studio.end', '종료 시간', 'time')}</div>
     <div class="sub">메이크업샵</div>
-    <div class="grid sched">${input('makeup.name', '메이크업샵 이름')}${input('makeup.teacher', '메이크업 선생님')}${input('makeup.link', '링크 <span class="opt">(선택)</span>', 'url', 'placeholder="https://"')}${input('makeup.start', '시작 시간', 'time')}${input('makeup.end', '종료 시간', 'time')}</div>`);
+    <div class="grid sched">${input('makeup.name', '메이크업샵 이름')}${input('makeup.teacher', '메이크업 선생님')}${input('makeup.link', '링크 <span class="opt">(선택)</span>', 'url', 'placeholder="https://"')}${input('makeup.start', '시작 시간', 'time')}${input('makeup.end', '종료 시간', 'time')}</div>`,
+  seg('studio.kind', ['스튜디오', '스냅'], '촬영 방식', 'kind'));
 }
 
 const muCard = (side, no, label) => card(`s-mu-${side}`, no, `메이크업 시안 · ${label}`, `
@@ -181,11 +188,13 @@ function hairCard(side, no, label) {
   return card(`s-hair-${side}`, no, `헤어 시안 · ${label}`, `${items}<button class="btn dashed" data-add="hair.${side}">+ 헤어 추가</button>`);
 }
 
-function dressCard() {
-  const items = state.dress.map((d, i) => `<div class="item wide">
-    <div class="fields">${thumbs(`dress.${i}.imgs`)}${bare(`dress.${i}.name`, '이름')}<textarea class="in" data-path="dress.${i}.desc" placeholder="설명" aria-label="설명">${esc(d.desc)}</textarea></div>
-    ${delBtn('dress', i)}</div>`).join('');
-  return card('s-dress', 'vii', '드레스', `${items}<button class="btn dashed" data-add="dress">+ 드레스 추가</button>`);
+// 드레스·부케·부토니에: 사진 여러 장 + 이름 + 설명 목록
+const ITEM_LISTS = [['dress', 'vii', '드레스'], ['bouquet', 'viii', '부케'], ['boutonniere', 'ix', '부토니에']];
+function listCard([key, no, title]) {
+  const items = state[key].map((d, i) => `<div class="item wide">
+    <div class="fields">${thumbs(`${key}.${i}.imgs`)}${bare(`${key}.${i}.name`, '이름')}<textarea class="in" data-path="${key}.${i}.desc" placeholder="설명" aria-label="설명">${esc(d.desc)}</textarea></div>
+    ${delBtn(key, i)}</div>`).join('');
+  return card(`s-${key}`, no, title, `${items}<button class="btn dashed" data-add="${key}">+ ${title} 추가</button>`);
 }
 
 function shotCard() {
@@ -193,12 +202,12 @@ function shotCard() {
     <div class="shot-h"><input class="in shot-name" data-path="shots.${i}.name" value="${esc(x.name)}" placeholder="컷 ${i + 1}" aria-label="컷 이름">${delBtn('shots', i)}</div>
     ${input(`shots.${i}.place`, '장소')}
     ${likePair(`shots.${i}`)}
-    <div class="grid">${select(`shots.${i}.hair`, '헤어 변형', 'hair')}${select(`shots.${i}.dress`, '드레스', 'dress')}</div></div>`).join('');
-  return card('s-shot', 'viii', '촬영 시안', `${items}<button class="btn dashed" data-add="shots">+ 촬영 시안 추가</button>`);
+    <div class="grid">${select(`shots.${i}.hair`, '헤어 변형', 'hair')}${select(`shots.${i}.dress`, '드레스', 'dress')}${select(`shots.${i}.bouquet`, '부케', 'bouquet')}${select(`shots.${i}.boutonniere`, '부토니에', 'boutonniere')}</div></div>`).join('');
+  return card('s-shot', 'x', '촬영 시안', `${items}<button class="btn dashed" data-add="shots">+ 촬영 시안 추가</button>`);
 }
 
 const TOC = [['s-basic', '기본정보'], ['s-sched', '일정'], ['s-mu-bride', '메이크업 · 신부'], ['s-mu-groom', '메이크업 · 신랑'],
-  ['s-hair-bride', '헤어 · 신부'], ['s-hair-groom', '헤어 · 신랑'], ['s-dress', '드레스'], ['s-shot', '촬영 시안']];
+  ['s-hair-bride', '헤어 · 신부'], ['s-hair-groom', '헤어 · 신랑'], ['s-dress', '드레스'], ['s-bouquet', '부케'], ['s-boutonniere', '부토니에'], ['s-shot', '촬영 시안']];
 
 const editorEl = document.getElementById('editor');
 function renderEditor() {
@@ -207,7 +216,7 @@ function renderEditor() {
     ${basicCard()}${scheduleCard()}
     ${muCard('bride', 'iii', '신부')}${muCard('groom', 'iv', '신랑')}
     ${hairCard('bride', 'v', '신부')}${hairCard('groom', 'vi', '신랑')}
-    ${dressCard()}${shotCard()}
+    ${ITEM_LISTS.map(listCard).join('')}${shotCard()}
     <div style="display:flex;justify-content:space-between;gap:8px"><button class="btn danger" data-reset>전체 지우기</button><button class="btn" data-view="view">시안 완성하기 →</button></div>
   </div>`;
 }
@@ -223,12 +232,13 @@ editorEl.addEventListener('input', (e) => {
   const { path } = e.target.dataset;
   if (!path || e.target.type === 'radio' || e.target.tagName === 'SELECT') return;
   update(path, e.target.value);
-  if (/^(hair\.\w+|dress)\.\d+\.name$/.test(path)) refreshShotSelects();
+  if (/^(hair\.\w+|dress|bouquet|boutonniere)\.\d+\.name$/.test(path)) refreshShotSelects();
 });
 editorEl.addEventListener('change', (e) => {
   const t = e.target;
   if (t.dataset.imgPath) return addImages(t);
   if (t.dataset.path && (t.type === 'radio' || t.tagName === 'SELECT')) update(t.dataset.path, t.value);
+  if (t.dataset.path === 'studio.kind') renderEditor();
 });
 editorEl.addEventListener('click', (e) => {
   const b = e.target.closest('button');

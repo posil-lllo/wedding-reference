@@ -6,6 +6,7 @@ const TILE_GAP = 0.5;
 const LABEL_H = 2.6;
 const HAIR_PER_SLIDE = 4;
 const DRESS_PER_SLIDE = 2;
+const ITEM_KINDS = [['dress', 'Dress', '드레스'], ['bouquet', 'Bouquet', '부케'], ['boutonniere', 'Boutonniere', '부토니에']];
 const WEEK = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -46,11 +47,13 @@ const titled = (en, ko, who, body) => `<div class="s-pad">
 </div>`;
 
 function coverSlide(s) {
+  const isSnap = s.studio.kind === '스냅';
   const sched = [
-    { en: 'Makeup', name: [s.makeup.name, s.makeup.teacher && `${s.makeup.teacher} 선생님`].filter(Boolean).join(' · '), start: s.makeup.start, end: s.makeup.end, link: s.makeup.link },
-    { en: 'Studio', name: [s.studio.name, s.studio.total].filter(Boolean).join(' · '), start: s.studio.start, end: s.studio.end },
+    { src: s.makeup, en: 'Makeup', name: [s.makeup.name, s.makeup.teacher && `${s.makeup.teacher} 선생님`].filter(Boolean).join(' · '), link: s.makeup.link },
+    { src: s.studio, en: isSnap ? 'Snap' : 'Studio', name: [s.studio.name, !isSnap && s.studio.total].filter(Boolean).join(' · ') },
   ]
-    .filter((x) => s[x.en === 'Makeup' ? 'makeup' : 'studio'].name || x.start || x.end)
+    .map((x) => ({ ...x, start: x.src.start, end: x.src.end }))
+    .filter((x) => x.src.name || x.start || x.end)
     .sort((a, b) => (a.start || '99').localeCompare(b.start || '99'));
   const nameHtml = (x) => (x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.name)}</a>` : esc(x.name));
   return `<div class="lace"><i class="edge-l"></i><i class="edge-r"></i>
@@ -81,26 +84,30 @@ function hairSlide(items, who) {
   return titled('Hair', '헤어 시안', who, cards.join(''));
 }
 
-function dressSlide(items) {
+function itemSlide(items, en, ko) {
   const w = (BODY_W - GAP * (DRESS_PER_SLIDE - 1)) / DRESS_PER_SLIDE;
   const cards = items.map((d) => `<div class="hcard" style="width:${w}cqw">
     ${collage(d.imgs, w, BODY_H - 7, '', '')}
     <div class="nm">${esc(d.name)}</div><div class="ds">${nl(d.desc)}</div>
   </div>`);
-  return titled('Dress', '드레스', '', cards.join(''));
+  return titled(en, ko, '', cards.join(''));
 }
 
 function shotSlide(shot, i, s) {
-  const hair = [...s.hair.groom, ...s.hair.bride].find((h) => h.id === shot.hair);
-  const dress = s.dress.find((d) => d.id === shot.dress);
+  const picked = (list, id, label) => {
+    const x = list.find((d) => d.id === id);
+    return x && `<div><dt>${label}</dt><dd>${esc(x.name)}</dd><div class="mini">${x.imgs.slice(0, 3).map((src) => `<img class="tile" src="${src}" alt="">`).join('')}</div></div>`;
+  };
   const meta = [
     shot.place && `<div><dt>장소</dt><dd>${esc(shot.place)}</dd></div>`,
-    hair && `<div><dt>헤어</dt><dd>${esc(hair.name)}</dd><div class="mini">${hair.imgs.slice(0, 3).map((src) => `<img class="tile" src="${src}" alt="">`).join('')}</div></div>`,
-    dress && `<div><dt>드레스</dt><dd>${esc(dress.name)}</dd><div class="mini">${dress.imgs.slice(0, 3).map((src) => `<img class="tile" src="${src}" alt="">`).join('')}</div></div>`,
+    picked([...s.hair.bride, ...s.hair.groom], shot.hair, '헤어'),
+    ...ITEM_KINDS.map(([key, , ko]) => picked(s[key], shot[key], ko)),
   ].filter(Boolean);
-  const metaW = 18;
+  // ponytail: 4개 이상이면 2열로 접어 세로 넘침 방지
+  const isTwoCol = meta.length > 3;
+  const metaW = isTwoCol ? 30 : 18;
   const right = BODY_W - (meta.length ? metaW + GAP : 0);
-  const metaHtml = meta.length ? `<dl class="meta" style="width:${metaW}cqw">${meta.join('')}</dl>` : '';
+  const metaHtml = meta.length ? `<dl class="meta${isTwoCol ? ' two' : ''}" style="width:${metaW}cqw">${meta.join('')}</dl>` : '';
   return titled(`Scene ${pad2(i + 1)}`, '촬영 시안', shot.name || shot.place, metaHtml + likeDislike(shot.like, shot.dislike, right));
 }
 
@@ -116,7 +123,9 @@ function buildSlides(s) {
   for (const [side, label, name] of people) {
     chunk(s.hair[side], HAIR_PER_SLIDE).forEach((items) => slides.push({ cap: `헤어 · ${label}`, html: hairSlide(items, `${label} ${name}`.trim()) }));
   }
-  chunk(s.dress, DRESS_PER_SLIDE).forEach((items) => slides.push({ cap: '드레스', html: dressSlide(items) }));
+  for (const [key, en, ko] of ITEM_KINDS) {
+    chunk(s[key], DRESS_PER_SLIDE).forEach((items) => slides.push({ cap: ko, html: itemSlide(items, en, ko) }));
+  }
   s.shots.forEach((shot, i) => slides.push({ cap: `촬영 시안 · ${shot.name || `컷 ${i + 1}`}`, html: shotSlide(shot, i, s) }));
   return slides;
 }
