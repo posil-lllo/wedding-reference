@@ -59,9 +59,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .card > header h2 { font-size: 18px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
 .sub { font-family: var(--serif); font-size: 15px; font-weight: 700; border-top: 1px dashed var(--line); padding-top: 14px; }
-.f { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.f { display: grid; gap: 4px; min-width: 0; font-size: 12px; color: var(--muted); }
 .f .opt { color: var(--accent-text); }
-.in { width: 100%; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; color: var(--ink); }
+.in { width: 100%; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; color: var(--ink); min-width: 0; }
+/* iOS 사파리의 날짜·시간 칸은 고유 너비가 커서 칸 밖으로 삐져나옴 */
+input.in[type="date"], input.in[type="time"] { -webkit-appearance: none; appearance: none; min-height: 40px; text-align: left; }
+input.in::-webkit-date-and-time-value { text-align: left; }
 textarea.in { min-height: 64px; resize: vertical; }
 .seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #fff; }
 .seg label { padding: 8px 10px; text-align: center; cursor: pointer; font-size: 13px; position: relative; }
@@ -156,6 +159,10 @@ textarea.in { min-height: 64px; resize: vertical; }
 .overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgb(255 255 255 / .85); font-family: var(--serif); font-size: 16px; color: var(--accent-text); }
 
 @media (max-width: 760px) {
+  .grid.basic { grid-template-columns: 1fr; }
+  /* 일정: 이름·방식(링크)은 한 줄씩, 시작·종료 시간은 반씩 나란히 */
+  .grid.sched { grid-template-columns: 1fr 1fr; }
+  .grid.sched > :nth-child(-n+2) { grid-column: 1 / -1; }
   .editor { grid-template-columns: 1fr; }
   .toc { position: static; display: flex; flex-wrap: wrap; gap: 4px; }
   .toc a { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 12px; }

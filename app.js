@@ -104,7 +104,7 @@ async function addImages(input) {
 
 // ── 입력 화면 마크업 ──
 const input = (path, label, type = 'text', extra = '') =>
-  `<label class="f">${label}<input class="in" type="${type}" data-path="${path}" value="${esc(get(path))}" ${extra}></label>`;
+  `<label class="f"><span>${label}</span><input class="in" type="${type}" data-path="${path}" value="${esc(get(path))}" ${extra}></label>`;
 const area = (path, label) => `<label class="f">${label}<textarea class="in" data-path="${path}">${esc(get(path))}</textarea></label>`;
 const bare = (path, ph) => `<input class="in" data-path="${path}" value="${esc(get(path))}" placeholder="${ph}" aria-label="${ph}">`;
 const addBtn = (path, one = false) =>
@@ -129,7 +129,7 @@ const select = (path, label, kind) =>
   `<label class="f">${label}<select class="in" data-path="${path}" data-opts="${kind}">${OPTIONS[kind](get(path))}</select></label>`;
 
 function basicCard() {
-  return card('s-basic', 'i', '기본정보', `<div class="grid">${input('basic.date', '촬영 날짜', 'date')}${input('basic.groom', '신랑 이름')}${input('basic.bride', '신부 이름')}</div>`);
+  return card('s-basic', 'i', '기본정보', `<div class="grid basic">${input('basic.date', '촬영 날짜', 'date')}${input('basic.groom', '신랑 이름')}${input('basic.bride', '신부 이름')}</div>`);
 }
 
 function scheduleCard() {
@@ -138,9 +138,9 @@ function scheduleCard() {
     .map((v) => `<label><input type="radio" name="total" value="${v}" data-path="studio.total"${v === total ? ' checked' : ''}>${v}</label>`).join('')}</div></div>`;
   return card('s-sched', 'ii', '일정', `
     <div class="sub">스튜디오</div>
-    <div class="grid">${input('studio.name', '스튜디오 이름')}${seg}${input('studio.start', '시작 시간', 'time')}${input('studio.end', '종료 시간', 'time')}</div>
+    <div class="grid sched">${input('studio.name', '스튜디오 이름')}${seg}${input('studio.start', '시작 시간', 'time')}${input('studio.end', '종료 시간', 'time')}</div>
     <div class="sub">메이크업샵</div>
-    <div class="grid">${input('makeup.name', '메이크업샵 이름')}${input('makeup.link', '링크 <span class="opt">(선택)</span>', 'url', 'placeholder="https://"')}${input('makeup.start', '시작 시간', 'time')}${input('makeup.end', '종료 시간', 'time')}</div>`);
+    <div class="grid sched">${input('makeup.name', '메이크업샵 이름')}${input('makeup.link', '링크 <span class="opt">(선택)</span>', 'url', 'placeholder="https://"')}${input('makeup.start', '시작 시간', 'time')}${input('makeup.end', '종료 시간', 'time')}</div>`);
 }
 
 const muCard = (side, no, label) => card(`s-mu-${side}`, no, `메이크업 시안 · ${label}`, `
