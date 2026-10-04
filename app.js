@@ -118,6 +118,7 @@ const cropBox = document.getElementById('crop-box');
 const cropCount = document.getElementById('crop-count');
 const cropOk = document.getElementById('crop-ok');
 const cropX = document.getElementById('crop-x');
+const cropSkip = document.getElementById('crop-skip');
 const CROP_ABORT = Symbol('abort');
 const CROP_MIN = 48; // 박스 최소 너비(화면 px)
 const CROP_PAD = 14; // 박스가 사진에 꽉 차도 모서리 핸들이 보이도록 사진 둘레 여백(px)
@@ -191,6 +192,7 @@ function cropImage(bmp, i, n) {
 
     cropCount.textContent = n > 1 ? `${i + 1} / ${n}` : '';
     cropOk.textContent = i < n - 1 ? '다음' : '확인';
+    cropSkip.hidden = n < 2;
     cropDlg.returnValue = '';
     paint();
     cropDlg.showModal();
