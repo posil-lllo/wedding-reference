@@ -33,7 +33,14 @@ const merge = (d, s) => (d && typeof d === 'object' && !Array.isArray(d) && s &&
   ? Object.fromEntries(Object.keys(d).map((k) => [k, merge(d[k], s[k])]))
   : s ?? d);
 
-let state = DEFAULT_STATE;
+// 목록은 늘 칸 1개 이상 보이게 하고, 빈 칸은 결과·선택지에서 뺌
+const LISTS = ['hair.bride', 'hair.groom', 'dress', 'shots'];
+const newItem = (list) => NEW_ITEM[list.split('.')[0]]();
+const isBlank = (x) => Object.entries(x).every(([k, v]) => k === 'id' || (Array.isArray(v) ? !v.length : !v));
+const withOneEach = (s) => LISTS.reduce((acc, p) => (getIn(acc, p).length ? acc : setIn(acc, toPath(p), [newItem(p)])), s);
+const withoutBlanks = (s) => LISTS.reduce((acc, p) => setIn(acc, toPath(p), getIn(acc, p).filter((x) => !isBlank(x))), s);
+
+let state = withOneEach(DEFAULT_STATE);
 const get = (path) => getIn(state, path);
 function update(path, v) {
   state = setIn(state, toPath(path), v);
@@ -131,10 +138,10 @@ const delBtn = (list, i) => `<button class="del" data-del="${list}" data-i="${i}
 const option = (value, label, sel) => `<option value="${esc(value)}"${value === sel ? ' selected' : ''}>${esc(label)}</option>`;
 
 const hairOptions = (sel) => '<option value="">선택 안 함</option>' + [['bride', '신부'], ['groom', '신랑']]
-  .filter(([side]) => state.hair[side].length)
-  .map(([side, label]) => `<optgroup label="${label}">${state.hair[side].map((h) => option(h.id, h.name || '(이름 없음)', sel)).join('')}</optgroup>`)
+  .filter(([side]) => state.hair[side].some((h) => !isBlank(h)))
+  .map(([side, label]) => `<optgroup label="${label}">${state.hair[side].filter((h) => !isBlank(h)).map((h) => option(h.id, h.name || '(이름 없음)', sel)).join('')}</optgroup>`)
   .join('');
-const dressOptions = (sel) => '<option value="">선택 안 함</option>' + state.dress.map((d) => option(d.id, d.name || '(이름 없음)', sel)).join('');
+const dressOptions = (sel) => '<option value="">선택 안 함</option>' + state.dress.filter((d) => !isBlank(d)).map((d) => option(d.id, d.name || '(이름 없음)', sel)).join('');
 const OPTIONS = { hair: hairOptions, dress: dressOptions };
 const select = (path, label, kind) =>
   `<label class="f">${label}<select class="in" data-path="${path}" data-opts="${kind}">${OPTIONS[kind](get(path))}</select></label>`;
@@ -222,13 +229,14 @@ editorEl.addEventListener('click', (e) => {
   if (!b) return;
   const { add, del, rmImg, i } = b.dataset;
   if (add) {
-    update(add, [...get(add), NEW_ITEM[add.split('.')[0]]()]);
+    update(add, [...get(add), newItem(add)]);
   } else if (del) {
     if (!confirm('이 항목을 삭제할까요?')) return;
-    update(del, get(del).filter((_, j) => j !== +i));
+    const rest = get(del).filter((_, j) => j !== +i);
+    update(del, rest.length ? rest : [newItem(del)]);
   } else if ('reset' in b.dataset) {
     if (!confirm('입력한 내용과 사진을 모두 지울까요?')) return;
-    state = { ...DEFAULT_STATE, pointColor: state.pointColor };
+    state = withOneEach({ ...DEFAULT_STATE, pointColor: state.pointColor });
   } else if (rmImg) {
     update(rmImg, i === undefined ? '' : get(rmImg).filter((_, j) => j !== +i));
   } else return;
@@ -271,7 +279,7 @@ function show(view) {
   document.getElementById('view-edit').hidden = view !== 'edit';
   document.getElementById('view-view').hidden = view !== 'view';
   document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.view === view)));
-  if (view === 'view') deckEl.innerHTML = renderDeck(state);
+  if (view === 'view') deckEl.innerHTML = renderDeck(withoutBlanks(state));
   scrollTo(0, 0);
 }
 document.addEventListener('click', (e) => {
@@ -304,7 +312,7 @@ document.getElementById('pdf').addEventListener('click', async (e) => {
 (async () => {
   try {
     const saved = await idb('readonly', (s) => s.get('current'));
-    if (saved) state = merge(DEFAULT_STATE, saved);
+    if (saved) state = withOneEach(merge(DEFAULT_STATE, saved));
   } catch (e) {
     console.error('load failed', e);
     setStatus('저장된 내용을 불러오지 못했어요', true);
