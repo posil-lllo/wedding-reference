@@ -50,7 +50,7 @@ function coverSlide(s) {
   const isSnap = s.studio.kind === '스냅';
   const sched = [
     { src: s.makeup, en: 'Makeup', name: [s.makeup.name, s.makeup.teacher && `${s.makeup.teacher} 선생님`].filter(Boolean).join(' · '), link: s.makeup.link },
-    { src: s.studio, en: isSnap ? 'Snap' : 'Studio', name: [s.studio.name, !isSnap && s.studio.total].filter(Boolean).join(' · ') },
+    { src: s.studio, en: isSnap ? 'Snap' : 'Studio', name: [s.studio.name, !isSnap && s.studio.total].filter(Boolean).join(' · '), link: s.studio.link },
   ]
     .map((x) => ({ ...x, start: x.src.start, end: x.src.end }))
     .filter((x) => x.src.name || x.start || x.end)

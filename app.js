@@ -2,7 +2,7 @@
 const emptyMu = () => ({ worry: '', want: '', dislike: [], like: [] });
 const DEFAULT_STATE = {
   basic: { date: '', groom: '', bride: '' },
-  studio: { kind: '스튜디오', name: '', total: '토탈', start: '', end: '' },
+  studio: { kind: '스튜디오', name: '', link: '', total: '토탈', start: '', end: '' },
   makeup: { name: '', teacher: '', link: '', start: '', end: '' },
   mu: { groom: emptyMu(), bride: emptyMu() },
   hair: { groom: [], bride: [] },
@@ -141,7 +141,7 @@ const thumb = (src, path, i) =>
   `<div class="thumb"><img src="${src}" alt=""><button class="x" data-rm-img="${path}" data-i="${i}" aria-label="사진 삭제">✕</button></div>`;
 const thumbs = (path) => `<div class="thumbs">${get(path).map((src, i) => thumb(src, path, i)).join('')}${addBtn(path)}</div>`;
 const drop = (path, kind, label) => `<div class="drop ${kind}"><span class="lbl">${label}</span>${thumbs(path)}</div>`;
-const likePair = (base, cls = '') => `<div class="pair ${cls}">${drop(`${base}.dislike`, 'dislike', '싫어요')}${drop(`${base}.like`, 'like', '좋아요')}</div>`;
+const likePair = (base) => `<div class="pair keep">${drop(`${base}.like`, 'like', '좋아요')}${drop(`${base}.dislike`, 'dislike', '싫어요 <span class="opt">(선택)</span>')}</div>`;
 const card = (id, no, title, body, aside = '') =>
   `<section class="card" id="${id}"><header><span class="no">${no}</span><h2>${title}</h2>${aside}</header>${body}</section>`;
 const delBtn = (list, i) => `<button class="del" data-del="${list}" data-i="${i}" aria-label="삭제">✕</button>`;
@@ -168,7 +168,7 @@ function scheduleCard() {
   const total = isSnap ? '' : `<div class="f">진행 방식${seg('studio.total', ['토탈', '비토탈'], '진행 방식')}</div>`;
   return card('s-sched', 'ii', '일정', `
     <div class="sub">${isSnap ? '스냅' : '스튜디오'}</div>
-    <div class="grid sched">${input('studio.name', isSnap ? '스냅 업체 이름' : '스튜디오 이름')}${total}${input('studio.start', '시작 시간', 'time')}${input('studio.end', '종료 시간', 'time')}</div>
+    <div class="grid sched">${input('studio.name', isSnap ? '스냅 업체 이름' : '스튜디오 이름')}${input('studio.link', '링크 <span class="opt">(선택)</span>', 'url', 'placeholder="https://"')}${total}${input('studio.start', '시작 시간', 'time')}${input('studio.end', '종료 시간', 'time')}</div>
     <div class="sub">메이크업샵</div>
     <div class="grid sched">${input('makeup.name', '메이크업샵 이름')}${input('makeup.teacher', '메이크업 선생님')}${input('makeup.link', '링크 <span class="opt">(선택)</span>', 'url', 'placeholder="https://"')}${input('makeup.start', '시작 시간', 'time')}${input('makeup.end', '종료 시간', 'time')}</div>`,
   seg('studio.kind', ['스튜디오', '스냅'], '촬영 방식', 'kind'));
@@ -201,7 +201,7 @@ function shotCard() {
   const items = state.shots.map((x, i) => `<div class="shot">
     <div class="shot-h"><input class="in shot-name" data-path="shots.${i}.name" value="${esc(x.name)}" placeholder="컷 ${i + 1}" aria-label="컷 이름">${delBtn('shots', i)}</div>
     ${input(`shots.${i}.place`, '장소')}
-    ${likePair(`shots.${i}`, 'keep')}
+    ${likePair(`shots.${i}`)}
     <div class="grid two">${select(`shots.${i}.hair`, '헤어 변형', 'hair')}${select(`shots.${i}.dress`, '드레스', 'dress')}${select(`shots.${i}.bouquet`, '부케', 'bouquet')}${select(`shots.${i}.boutonniere`, '부토니에', 'boutonniere')}</div></div>`).join('');
   return card('s-shot', 'x', '촬영 시안', `${items}<button class="btn dashed" data-add="shots">+ 촬영 시안 추가</button>`);
 }
