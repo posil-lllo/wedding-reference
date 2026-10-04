@@ -469,3 +469,5 @@ document.getElementById('pdf').addEventListener('click', async (e) => {
   applyPointColor(state.pointColor);
   renderEditor();
 })();
+
+document.getElementById('fb-go').addEventListener('click', () => document.getElementById('fb').hidePopover());
