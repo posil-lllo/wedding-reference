@@ -48,10 +48,10 @@
 
 <dialog class="crop" id="crop" aria-labelledby="crop-h">
   <form method="dialog">
-    <p class="crop-h" id="crop-h">사진 위치 조절 <span id="crop-count"></span></p>
-    <p class="note">격자를 끌어 옮기고, 모서리를 끌어 크기를 조절해요.</p>
+    <div class="crop-top"><p class="crop-h" id="crop-h">사진 크기 조절</p><button type="button" class="crop-x" id="crop-x" aria-label="닫기">✕</button></div>
+    <p class="note">격자를 끌어 옮기고, 모서리를 끌어 크기를 조절해주세요.</p>
     <div class="crop-stage" id="crop-stage"><canvas id="crop-cv"></canvas><div class="crop-box" id="crop-box"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i></div></div>
-    <div class="crop-btns"><button class="btn pill" value="cancel">빼기</button><button class="btn" value="ok">확인</button></div>
+    <div class="crop-btns"><span id="crop-count"></span><button class="btn pill" value="cancel">빼기</button><button class="btn" value="ok" id="crop-ok" autofocus>확인</button></div>
   </form>
 </dialog>
 <div class="overlay" id="overlay" hidden>PDF 만드는 중…</div>

@@ -116,11 +116,14 @@ const cropStage = document.getElementById('crop-stage');
 const cropCv = document.getElementById('crop-cv');
 const cropBox = document.getElementById('crop-box');
 const cropCount = document.getElementById('crop-count');
+const cropOk = document.getElementById('crop-ok');
+const cropX = document.getElementById('crop-x');
+const CROP_ABORT = Symbol('abort');
 const CROP_MIN = 48; // 박스 최소 너비(화면 px)
 
 // 사진 전체를 화면에 맞춰 보여 주고, 그 위 3:4 박스를 옮기거나 모서리로 크기 조절
-// 닫힐 때 확인이면 박스 영역의 data URL, 취소·Esc 면 null
-function cropImage(bmp, count) {
+// 닫힐 때 확인이면 박스 영역의 data URL, 빼기면 null, X·Esc 면 CROP_ABORT
+function cropImage(bmp, i, n) {
   return new Promise((resolve) => {
     const f = Math.min(Math.min(innerWidth * 0.8, 360) / bmp.width, (innerHeight * 0.6) / bmp.height);
     const dw = bmp.width * f;
@@ -171,13 +174,22 @@ function cropImage(bmp, count) {
     cropStage.addEventListener('pointercancel', () => { drag = null; }, { signal });
     cropDlg.addEventListener('close', () => {
       ac.abort();
+      if (cropDlg.returnValue === 'abort') return resolve(CROP_ABORT);
       if (cropDlg.returnValue !== 'ok') return resolve(null);
       const out = Object.assign(document.createElement('canvas'), { width: IMG_W, height: IMG_H });
       out.getContext('2d').drawImage(bmp, x / f, y / f, w / f, h / f, 0, 0, IMG_W, IMG_H);
       resolve(out.toDataURL('image/jpeg', 0.85));
     }, { signal });
 
-    cropCount.textContent = count;
+    const abort = (e) => {
+      e.preventDefault();
+      if (confirm('선택한 사진이 사라집니다. 닫으시겠습니까?')) cropDlg.close('abort');
+    };
+    cropX.addEventListener('click', abort, { signal });
+    cropDlg.addEventListener('cancel', abort, { signal });
+
+    cropCount.textContent = n > 1 ? `${i + 1} / ${n}` : '';
+    cropOk.textContent = i < n - 1 ? '다음' : '확인';
     cropDlg.returnValue = '';
     paint();
     cropDlg.showModal();
@@ -199,8 +211,9 @@ async function addImages(input) {
       failed += 1;
       continue;
     }
-    const url = await cropImage(bmp, files.length > 1 ? `${i + 1} / ${files.length}` : '');
+    const url = await cropImage(bmp, i, files.length);
     bmp.close();
+    if (url === CROP_ABORT) return;
     if (url) ok.push(url);
   }
   if (ok.length) update(imgPath, [...get(imgPath), ...ok]);
