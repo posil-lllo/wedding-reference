@@ -214,6 +214,7 @@ textarea.in { min-height: 64px; resize: vertical; }
   .pair { grid-template-columns: 1fr; }
   .top-r { margin-left: 0; width: 100%; }
   .top-r .tabs { margin-right: auto; }
+  .pdf-bar .btn { max-width: none; }
 }
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
