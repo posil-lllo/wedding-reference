@@ -115,7 +115,7 @@ textarea.in { min-height: 64px; resize: vertical; }
 .crop-box [data-h="sw"] { bottom: -3px; left: -3px; border-width: 0 0 3px 3px; cursor: nesw-resize; }
 .crop-box [data-h="se"] { bottom: -3px; right: -3px; border-width: 0 3px 3px 0; cursor: nwse-resize; }
 .crop-btns { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-.crop-btns .btn { padding: 5px 14px; }
+.crop-btns .btn { padding: 5px 14px; font-size: 13px; }
 .crop .btn.soft { border-color: #f1f0ec; background: #f1f0ec; color: var(--ink); }
 .add-img input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .add-img:has(input:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: 2px; }
