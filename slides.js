@@ -106,7 +106,7 @@ function shotSlide(shot, i, s) {
 
 function buildSlides(s) {
   const slides = [{ cap: '커버', cls: 'cover', html: coverSlide(s) }];
-  const people = [['groom', '신랑', s.basic.groom], ['bride', '신부', s.basic.bride]];
+  const people = [['bride', '신부', s.basic.bride], ['groom', '신랑', s.basic.groom]];
   for (const [side, label, name] of people) {
     const mu = s.mu[side];
     if (mu.worry || mu.want || mu.like.length || mu.dislike.length) {

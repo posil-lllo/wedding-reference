@@ -119,7 +119,7 @@ const card = (id, no, title, body, note = '') =>
 const delBtn = (list, i) => `<button class="del" data-del="${list}" data-i="${i}" aria-label="삭제">✕</button>`;
 const option = (value, label, sel) => `<option value="${esc(value)}"${value === sel ? ' selected' : ''}>${esc(label)}</option>`;
 
-const hairOptions = (sel) => '<option value="">선택 안 함</option>' + [['groom', '신랑'], ['bride', '신부']]
+const hairOptions = (sel) => '<option value="">선택 안 함</option>' + [['bride', '신부'], ['groom', '신랑']]
   .filter(([side]) => state.hair[side].length)
   .map(([side, label]) => `<optgroup label="${label}">${state.hair[side].map((h) => option(h.id, h.name || '(이름 없음)', sel)).join('')}</optgroup>`)
   .join('');
@@ -173,16 +173,16 @@ function shotCard() {
   return card('s-shot', 'viii', '촬영 시안', `${items}<button class="btn dashed" data-add="shots">+ 촬영 시안 추가</button>`);
 }
 
-const TOC = [['s-basic', '기본정보'], ['s-sched', '일정'], ['s-mu-groom', '메이크업 · 신랑'], ['s-mu-bride', '메이크업 · 신부'],
-  ['s-hair-groom', '헤어 · 신랑'], ['s-hair-bride', '헤어 · 신부'], ['s-dress', '드레스'], ['s-shot', '촬영 시안']];
+const TOC = [['s-basic', '기본정보'], ['s-sched', '일정'], ['s-mu-bride', '메이크업 · 신부'], ['s-mu-groom', '메이크업 · 신랑'],
+  ['s-hair-bride', '헤어 · 신부'], ['s-hair-groom', '헤어 · 신랑'], ['s-dress', '드레스'], ['s-shot', '촬영 시안']];
 
 const editorEl = document.getElementById('editor');
 function renderEditor() {
   editorEl.innerHTML = `<nav class="toc" aria-label="섹션">${TOC.map(([id, l]) => `<a href="#${id}">${l}</a>`).join('')}</nav>
   <div class="forms">
     ${basicCard()}${scheduleCard()}
-    ${muCard('groom', 'iii', '신랑')}${muCard('bride', 'iv', '신부')}
-    ${hairCard('groom', 'v', '신랑')}${hairCard('bride', 'vi', '신부')}
+    ${muCard('bride', 'iii', '신부')}${muCard('groom', 'iv', '신랑')}
+    ${hairCard('bride', 'v', '신부')}${hairCard('groom', 'vi', '신랑')}
     ${dressCard()}${shotCard()}
     <div style="display:flex;justify-content:space-between;gap:8px"><button class="btn danger" data-reset>전체 지우기</button><button class="btn" data-view="view">시안 완성하기 →</button></div>
   </div>`;
