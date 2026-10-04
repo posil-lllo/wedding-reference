@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>웨딩 촬영 레퍼런스</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <div class="brand">Our Wedding Shoot <small>촬영 시안 만들기</small></div>
+  <span class="status" id="status" role="status"></span>
+  <div class="top-r">
+    <details class="settings">
+      <summary>색 설정</summary>
+      <div class="settings-panel">
+        <div class="seg" role="radiogroup" aria-label="배경 종류">
+          <label><input type="radio" name="bgmode" value="solid">단색</label>
+          <label><input type="radio" name="bgmode" value="stripe">스트라이프</label>
+        </div>
+        <label class="bgpick">배경 <input type="color" data-theme="ivory"><input class="hex" data-hex="ivory" maxlength="7" spellcheck="false" aria-label="배경 색 코드"></label>
+        <label class="bgpick" id="stripe-pick">줄 색 <input type="color" data-theme="stripe"><input class="hex" data-hex="stripe" maxlength="7" spellcheck="false" aria-label="줄 색 코드"></label>
+        <label class="bgpick">카드 <input type="color" data-theme="paper"><input class="hex" data-hex="paper" maxlength="7" spellcheck="false" aria-label="카드 색 코드"></label>
+        <label class="bgpick">포인트 배경 <input type="color" data-theme="accent"><input class="hex" data-hex="accent" maxlength="7" spellcheck="false" aria-label="포인트 배경 색 코드"></label>
+        <label class="bgpick">포인트 글씨 <input type="color" data-theme="accentText"><input class="hex" data-hex="accentText" maxlength="7" spellcheck="false" aria-label="포인트 글씨 색 코드"></label>
+        <label class="bgpick">버튼 글씨 <input type="color" data-theme="onAccent"><input class="hex" data-hex="onAccent" maxlength="7" spellcheck="false" aria-label="버튼 글씨 색 코드"></label>
+        <hr>
+        <button class="btn danger" id="reset">입력 내용 전체 지우기</button>
+      </div>
+    </details>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-view="edit">입력</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="view">결과 미리보기</button>
+    </div>
+  </div>
+</div></div>
+
+<main class="wrap" id="view-edit">
+  <div class="editor" id="editor"></div>
+</main>
+
+<main class="wrap deck" id="view-view" hidden>
+  <div class="deck-h">
+    <div><h1 style="font-size:22px">결과 미리보기</h1><p class="note" style="margin:0">가로 16:9 한 장씩 → PDF 한 파일로 이어 붙임</p></div>
+    <div style="display:flex;gap:8px"><button class="btn ghost" data-view="edit">← 수정</button><button class="btn" id="pdf">PDF 내보내기</button></div>
+  </div>
+  <div class="slides" id="deck"></div>
+</main>
+
+<div class="overlay" id="overlay" hidden>PDF 만드는 중…</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="collage.js"></script>
+<script src="slides.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
