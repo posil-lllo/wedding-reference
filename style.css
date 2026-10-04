@@ -5,7 +5,7 @@
   --line: #eae7dc;
   --ink: #3a3d44;
   --muted: #8a8d93;
-  --accent: #7fa8d6;
+  --accent: #6a9edb;
   --accent-text: #6d93bd;
   --like: #7d9a7a;
   --dislike: #b88378;
@@ -139,7 +139,7 @@ textarea.in { min-height: 64px; resize: vertical; }
 /* 미리보기 하단 고정 PDF 버튼 */
 .pdf-bar { position: sticky; bottom: 0; z-index: 5; padding: 12px 0 calc(12px + env(safe-area-inset-bottom)); background: var(--ivory); border-top: 1px solid var(--line); }
 .pdf-bar .btn { display: block; width: 100%; max-width: 360px; margin: 0 auto; padding: 12px 16px; font-size: 15px; }
-.deck-h { display: flex; justify-content: space-between; align-items: end; gap: 12px; flex-wrap: wrap; }
+.deck-h { display: flex; justify-content: flex-end; align-items: end; gap: 12px; flex-wrap: wrap; }
 .slides { display: grid; gap: 28px; }
 .slide-wrap { display: grid; gap: 6px; }
 .slide-cap { font-size: 12px; color: var(--muted); display: flex; gap: 8px; }
