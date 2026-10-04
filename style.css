@@ -96,7 +96,8 @@ textarea.in { min-height: 64px; resize: vertical; }
 .del { border: 0; background: none; color: var(--muted); cursor: pointer; align-self: start; }
 .item .fields { display: grid; gap: 8px; min-width: 0; }
 .shot { border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 12px; background: #fff; }
-.shot-h { display: flex; justify-content: space-between; align-items: center; font-family: var(--serif); font-weight: 700; }
+.shot-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.shot-name { font-family: var(--serif); font-weight: 700; font-size: 15px; }
 .empty-msg { font-size: 13px; color: var(--muted); margin: 0; }
 
 /* 결과 화면 */

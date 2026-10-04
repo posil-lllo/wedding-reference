@@ -18,7 +18,7 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const NEW_ITEM = {
   hair: () => ({ id: uid(), img: '', name: '', desc: '' }),
   dress: () => ({ id: uid(), imgs: [], name: '', desc: '' }),
-  shots: () => ({ id: uid(), hair: '', place: '', dress: '', dislike: [], like: [] }),
+  shots: () => ({ id: uid(), name: '', hair: '', place: '', dress: '', dislike: [], like: [] }),
 };
 
 // ── 불변 경로 갱신 ──
@@ -131,7 +131,7 @@ const thumb = (src, path, i) =>
   `<div class="thumb"><img src="${src}" alt=""><button class="x" data-rm-img="${path}" ${i === undefined ? '' : `data-i="${i}"`} aria-label="사진 삭제">✕</button></div>`;
 const thumbs = (path) => `<div class="thumbs">${get(path).map((src, i) => thumb(src, path, i)).join('')}${addBtn(path)}</div>`;
 const drop = (path, kind, label) => `<div class="drop ${kind}"><span class="lbl">${label}</span>${thumbs(path)}</div>`;
-const likePair = (base) => `<div class="pair">${drop(`${base}.dislike`, 'dislike', '싫어요 · 여러 장')}${drop(`${base}.like`, 'like', '좋아요 · 여러 장')}</div>`;
+const likePair = (base) => `<div class="pair">${drop(`${base}.dislike`, 'dislike', '싫어요')}${drop(`${base}.like`, 'like', '좋아요')}</div>`;
 const card = (id, no, title, body, note = '') =>
   `<section class="card" id="${id}"><header><span class="no">${no}</span><h2>${title}</h2>${note ? `<span class="note">${note}</span>` : ''}</header>${body}</section>`;
 const delBtn = (list, i) => `<button class="del" data-del="${list}" data-i="${i}" aria-label="삭제">✕</button>`;
@@ -184,10 +184,10 @@ function dressCard() {
 }
 
 function shotCard() {
-  const items = state.shots.map((_, i) => `<div class="shot">
-    <div class="shot-h">컷 ${i + 1} ${delBtn('shots', i)}</div>
-    <div class="grid">${select(`shots.${i}.hair`, '헤어 변형', 'hair')}${input(`shots.${i}.place`, '장소')}${select(`shots.${i}.dress`, '드레스', 'dress')}</div>
-    ${likePair(`shots.${i}`)}</div>`).join('');
+  const items = state.shots.map((x, i) => `<div class="shot">
+    <div class="shot-h"><input class="in shot-name" data-path="shots.${i}.name" value="${esc(x.name)}" placeholder="컷 ${i + 1}" aria-label="컷 이름">${delBtn('shots', i)}</div>
+    ${likePair(`shots.${i}`)}
+    <div class="grid">${input(`shots.${i}.place`, '장소')}${select(`shots.${i}.hair`, '헤어 변형', 'hair')}${select(`shots.${i}.dress`, '드레스', 'dress')}</div></div>`).join('');
   return card('s-shot', 'viii', '촬영 시안', `${items}<button class="btn dashed" data-add="shots">+ 촬영 시안 추가</button>`);
 }
 

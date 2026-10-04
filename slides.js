@@ -94,14 +94,14 @@ function shotSlide(shot, i, s) {
   const hair = [...s.hair.groom, ...s.hair.bride].find((h) => h.id === shot.hair);
   const dress = s.dress.find((d) => d.id === shot.dress);
   const meta = [
+    shot.place && `<div><dt>장소</dt><dd>${esc(shot.place)}</dd></div>`,
     hair && `<div><dt>헤어</dt><dd>${esc(hair.name)}</dd>${hair.img ? `<div class="mini"><img class="tile" src="${hair.img}" alt=""></div>` : ''}</div>`,
     dress && `<div><dt>드레스</dt><dd>${esc(dress.name)}</dd><div class="mini">${dress.imgs.slice(0, 3).map((src) => `<img class="tile" src="${src}" alt="">`).join('')}</div></div>`,
-    shot.place && `<div><dt>장소</dt><dd>${esc(shot.place)}</dd></div>`,
   ].filter(Boolean);
   const metaW = 18;
   const right = BODY_W - (meta.length ? metaW + GAP : 0);
   const metaHtml = meta.length ? `<dl class="meta" style="width:${metaW}cqw">${meta.join('')}</dl>` : '';
-  return titled(`Scene ${pad2(i + 1)}`, '촬영 시안', shot.place, metaHtml + likeDislike(shot.like, shot.dislike, right));
+  return titled(`Scene ${pad2(i + 1)}`, '촬영 시안', shot.name || shot.place, metaHtml + likeDislike(shot.like, shot.dislike, right));
 }
 
 function buildSlides(s) {
@@ -117,7 +117,7 @@ function buildSlides(s) {
     chunk(s.hair[side], HAIR_PER_SLIDE).forEach((items) => slides.push({ cap: `헤어 · ${label}`, html: hairSlide(items, `${label} ${name}`.trim()) }));
   }
   chunk(s.dress, DRESS_PER_SLIDE).forEach((items) => slides.push({ cap: '드레스', html: dressSlide(items) }));
-  s.shots.forEach((shot, i) => slides.push({ cap: `촬영 시안 · 컷 ${i + 1}`, html: shotSlide(shot, i, s) }));
+  s.shots.forEach((shot, i) => slides.push({ cap: `촬영 시안 · ${shot.name || `컷 ${i + 1}`}`, html: shotSlide(shot, i, s) }));
   return slides;
 }
 
