@@ -248,6 +248,7 @@ pointHex.addEventListener('input', () => {
   pointHex.setAttribute('aria-invalid', String(!hex));
   if (hex) setPointColor(hex);
 });
+document.getElementById('point-reset').addEventListener('click', () => setPointColor(DEFAULT_STATE.pointColor));
 pointHex.addEventListener('blur', () => {
   pointHex.value = state.pointColor;
   pointHex.removeAttribute('aria-invalid');
