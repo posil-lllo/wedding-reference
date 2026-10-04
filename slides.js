@@ -47,7 +47,7 @@ const titled = (en, ko, who, body) => `<div class="s-pad">
 
 function coverSlide(s) {
   const sched = [
-    { en: 'Makeup', name: s.makeup.name, start: s.makeup.start, end: s.makeup.end, link: s.makeup.link },
+    { en: 'Makeup', name: [s.makeup.name, s.makeup.teacher && `${s.makeup.teacher} 선생님`].filter(Boolean).join(' · '), start: s.makeup.start, end: s.makeup.end, link: s.makeup.link },
     { en: 'Studio', name: [s.studio.name, s.studio.total].filter(Boolean).join(' · '), start: s.studio.start, end: s.studio.end },
   ]
     .filter((x) => s[x.en === 'Makeup' ? 'makeup' : 'studio'].name || x.start || x.end)

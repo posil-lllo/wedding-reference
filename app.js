@@ -3,7 +3,7 @@ const emptyMu = () => ({ worry: '', want: '', dislike: [], like: [] });
 const DEFAULT_STATE = {
   basic: { date: '', groom: '', bride: '' },
   studio: { name: '', total: '토탈', start: '', end: '' },
-  makeup: { name: '', link: '', start: '', end: '' },
+  makeup: { name: '', teacher: '', link: '', start: '', end: '' },
   mu: { groom: emptyMu(), bride: emptyMu() },
   hair: { groom: [], bride: [] },
   dress: [],
@@ -140,7 +140,7 @@ function scheduleCard() {
     <div class="sub">스튜디오</div>
     <div class="grid sched">${input('studio.name', '스튜디오 이름')}${seg}${input('studio.start', '시작 시간', 'time')}${input('studio.end', '종료 시간', 'time')}</div>
     <div class="sub">메이크업샵</div>
-    <div class="grid sched">${input('makeup.name', '메이크업샵 이름')}${input('makeup.link', '링크 <span class="opt">(선택)</span>', 'url', 'placeholder="https://"')}${input('makeup.start', '시작 시간', 'time')}${input('makeup.end', '종료 시간', 'time')}</div>`);
+    <div class="grid sched">${input('makeup.name', '메이크업샵 이름')}${input('makeup.teacher', '메이크업 선생님')}${input('makeup.link', '링크 <span class="opt">(선택)</span>', 'url', 'placeholder="https://"')}${input('makeup.start', '시작 시간', 'time')}${input('makeup.end', '종료 시간', 'time')}</div>`);
 }
 
 const muCard = (side, no, label) => card(`s-mu-${side}`, no, `메이크업 시안 · ${label}`, `

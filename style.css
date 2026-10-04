@@ -162,7 +162,7 @@ textarea.in { min-height: 64px; resize: vertical; }
   .grid.basic { grid-template-columns: 1fr; }
   /* 일정: 이름·방식(링크)은 한 줄씩, 시작·종료 시간은 반씩 나란히 */
   .grid.sched { grid-template-columns: 1fr 1fr; }
-  .grid.sched > :nth-child(-n+2) { grid-column: 1 / -1; }
+  .grid.sched > :nth-last-child(n+3) { grid-column: 1 / -1; }
   .editor { grid-template-columns: 1fr; }
   .toc { position: static; display: flex; flex-wrap: wrap; gap: 4px; }
   .toc a { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 12px; }
