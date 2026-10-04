@@ -41,19 +41,29 @@ function update(path, v) {
 }
 
 // ── IndexedDB 저장 ──
-const dbReady = new Promise((resolve, reject) => {
+// iOS Safari 는 앱 전환 뒤 연결이 끊기는 일이 있어, 실패하면 새로 열어 한 번 더 시도
+let dbReady = null;
+const openDb = () => (dbReady = new Promise((resolve, reject) => {
   const req = indexedDB.open('wedding-ref', 1);
   req.onupgradeneeded = () => req.result.createObjectStore('state');
-  req.onsuccess = () => resolve(req.result);
+  req.onsuccess = () => {
+    req.result.onclose = () => { dbReady = null; };
+    resolve(req.result);
+  };
   req.onerror = () => reject(req.error);
-});
-const idb = (mode, fn) => dbReady.then((db) => new Promise((resolve, reject) => {
+}));
+const runTx = (mode, fn) => (dbReady || openDb()).then((db) => new Promise((resolve, reject) => {
   const tx = db.transaction('state', mode);
   const req = fn(tx.objectStore('state'));
   tx.oncomplete = () => resolve(req.result);
   tx.onerror = () => reject(tx.error);
   tx.onabort = () => reject(tx.error);
 }));
+const idb = (mode, fn) => runTx(mode, fn).catch((e) => {
+  console.warn('idb retry', e);
+  dbReady = null;
+  return runTx(mode, fn);
+});
 
 const statusEl = document.getElementById('status');
 const setStatus = (msg, isErr = false) => {
@@ -70,7 +80,7 @@ function scheduleSave() {
       setStatus('저장됨');
     } catch (e) {
       console.error('save failed', e);
-      setStatus('저장 실패 — 브라우저 저장 공간을 확인해 주세요', true);
+      setStatus(`저장 실패 (${e?.name || e}) — 브라우저 저장 공간을 확인해 주세요`, true);
     }
   }, SAVE_DELAY);
 }
