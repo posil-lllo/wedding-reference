@@ -72,7 +72,7 @@ function makeupSlide(mu, who) {
   const block = (label, v) => (v ? `<div><div class="s-lbl">${label}</div><div class="s-txt">${nl(v)}</div></div>` : '');
   const text = mu.worry || mu.likeDesc || mu.dislikeDesc ? `<div class="s-text" style="width:${textW}cqw">${block('고민인 부분', mu.worry)}${block('좋아요', mu.likeDesc)}${block('싫어요', mu.dislikeDesc)}</div>` : '';
   const right = BODY_W - (text ? textW + GAP : 0);
-  return titled('Makeup', '메이크업 시안', who, text + likeDislike(mu.like, mu.dislike, right));
+  return titled('Makeup', `메이크업 시안 · ${esc(who)}`, '', text + likeDislike(mu.like, mu.dislike, right));
 }
 
 function hairSlide(items, who) {
@@ -81,7 +81,7 @@ function hairSlide(items, who) {
     ${h.imgs.length ? collage(h.imgs, w, BODY_H - 7, '', '') : '<div class="tile empty"></div>'}
     <div class="nm">${esc(h.name)}</div><div class="ds">${nl(h.desc)}</div>
   </div>`);
-  return titled('Hair', '헤어 시안', who, cards.join(''));
+  return titled('Hair', `헤어 시안 · ${esc(who)}`, '', cards.join(''));
 }
 
 function itemSlide(items, en, ko) {
