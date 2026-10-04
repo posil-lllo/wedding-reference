@@ -141,7 +141,7 @@ const thumb = (src, path, i) =>
   `<div class="thumb"><img src="${src}" alt=""><button class="x" data-rm-img="${path}" data-i="${i}" aria-label="사진 삭제">✕</button></div>`;
 const thumbs = (path) => `<div class="thumbs">${get(path).map((src, i) => thumb(src, path, i)).join('')}${addBtn(path)}</div>`;
 const drop = (path, kind, label) => `<div class="drop ${kind}"><span class="lbl">${label}</span>${thumbs(path)}</div>`;
-const likePair = (base) => `<div class="pair keep">${drop(`${base}.like`, 'like', '좋아요')}${drop(`${base}.dislike`, 'dislike', '싫어요 <span class="opt">(선택)</span>')}</div>`;
+const likePair = (base) => `<div class="pair">${drop(`${base}.like`, 'like', '좋아요')}${drop(`${base}.dislike`, 'dislike', '싫어요 <span class="opt">(선택)</span>')}</div>`;
 const card = (id, no, title, body, aside = '') =>
   `<section class="card" id="${id}"><header><span class="no">${no}</span><h2>${title}</h2>${aside}</header>${body}</section>`;
 const delBtn = (list, i) => `<button class="del" data-del="${list}" data-i="${i}" aria-label="삭제">✕</button>`;

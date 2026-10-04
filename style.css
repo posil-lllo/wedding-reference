@@ -177,7 +177,7 @@ textarea.in { min-height: 64px; resize: vertical; }
   .grid.sched { grid-template-columns: 1fr 1fr; }
   .grid.sched > :nth-last-child(n+3) { grid-column: 1 / -1; }
   .brand { flex-basis: 100%; }
-  .pair:not(.keep) { grid-template-columns: 1fr; }
+  .pair { grid-template-columns: 1fr; }
   .top-r { margin-left: 0; width: 100%; justify-content: space-between; }
 }
 html { scroll-behavior: smooth; }
