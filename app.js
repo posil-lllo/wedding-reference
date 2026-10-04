@@ -170,7 +170,7 @@ function shotCard() {
     <div class="shot-h">컷 ${i + 1} ${delBtn('shots', i)}</div>
     <div class="grid">${select(`shots.${i}.hair`, '헤어 변형', 'hair')}${input(`shots.${i}.place`, '장소')}${select(`shots.${i}.dress`, '드레스', 'dress')}</div>
     ${likePair(`shots.${i}`)}</div>`).join('');
-  return card('s-shot', 'viii', '촬영 시안', `${items}<button class="btn dashed" data-add="shots">+ 촬영 시안 추가</button>`, '한 항목 = PDF 한 장');
+  return card('s-shot', 'viii', '촬영 시안', `${items}<button class="btn dashed" data-add="shots">+ 촬영 시안 추가</button>`);
 }
 
 const TOC = [['s-basic', '기본정보'], ['s-sched', '일정'], ['s-mu-groom', '메이크업 · 신랑'], ['s-mu-bride', '메이크업 · 신부'],
