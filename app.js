@@ -186,8 +186,9 @@ function dressCard() {
 function shotCard() {
   const items = state.shots.map((x, i) => `<div class="shot">
     <div class="shot-h"><input class="in shot-name" data-path="shots.${i}.name" value="${esc(x.name)}" placeholder="컷 ${i + 1}" aria-label="컷 이름">${delBtn('shots', i)}</div>
+    ${input(`shots.${i}.place`, '장소')}
     ${likePair(`shots.${i}`)}
-    <div class="grid">${input(`shots.${i}.place`, '장소')}${select(`shots.${i}.hair`, '헤어 변형', 'hair')}${select(`shots.${i}.dress`, '드레스', 'dress')}</div></div>`).join('');
+    <div class="grid">${select(`shots.${i}.hair`, '헤어 변형', 'hair')}${select(`shots.${i}.dress`, '드레스', 'dress')}</div></div>`).join('');
   return card('s-shot', 'viii', '촬영 시안', `${items}<button class="btn dashed" data-add="shots">+ 촬영 시안 추가</button>`);
 }
 
