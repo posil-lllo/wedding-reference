@@ -49,9 +49,8 @@
 <dialog class="crop" id="crop" aria-labelledby="crop-h">
   <form method="dialog">
     <p class="crop-h" id="crop-h">사진 위치 조절 <span id="crop-count"></span></p>
-    <p class="note">드래그해서 위치를 옮기고, 아래 막대로 확대해요.</p>
-    <canvas id="crop-cv" width="900" height="1200"></canvas>
-    <input type="range" id="crop-zoom" min="1" max="3" step="0.01" value="1" aria-label="확대">
+    <p class="note">격자를 끌어 옮기고, 모서리를 끌어 크기를 조절해요.</p>
+    <div class="crop-stage" id="crop-stage"><canvas id="crop-cv"></canvas><div class="crop-box" id="crop-box"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i></div></div>
     <div class="crop-btns"><button class="btn pill" value="cancel">빼기</button><button class="btn" value="ok">확인</button></div>
   </form>
 </dialog>

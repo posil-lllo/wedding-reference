@@ -110,59 +110,76 @@ function scheduleSave() {
   }, SAVE_DELAY);
 }
 
-// ── 사진: 크롭 창에서 위치·확대를 정해 3:4 JPEG data URL 로 ──
+// ── 사진: 크롭 창에서 3:4 영역을 골라 JPEG data URL 로 ──
 const cropDlg = document.getElementById('crop');
+const cropStage = document.getElementById('crop-stage');
 const cropCv = document.getElementById('crop-cv');
-const cropZoom = document.getElementById('crop-zoom');
+const cropBox = document.getElementById('crop-box');
 const cropCount = document.getElementById('crop-count');
+const CROP_MIN = 48; // 박스 최소 너비(화면 px)
 
-// 닫힐 때 확인이면 data URL, 취소·Esc 면 null
+// 사진 전체를 화면에 맞춰 보여 주고, 그 위 3:4 박스를 옮기거나 모서리로 크기 조절
+// 닫힐 때 확인이면 박스 영역의 data URL, 취소·Esc 면 null
 function cropImage(bmp, count) {
   return new Promise((resolve) => {
-    const ctx = cropCv.getContext('2d');
-    const base = Math.max(IMG_W / bmp.width, IMG_H / bmp.height);
-    let zoom = 1;
-    const size = () => [bmp.width * base * zoom, bmp.height * base * zoom];
-    let [w, h] = size();
-    let x = (IMG_W - w) / 2;
-    let y = (IMG_H - h) / 2;
-    const draw = () => {
-      [w, h] = size();
-      x = Math.min(0, Math.max(IMG_W - w, x));
-      y = Math.min(0, Math.max(IMG_H - h, y));
-      ctx.drawImage(bmp, x, y, w, h);
-    };
+    const f = Math.min(Math.min(innerWidth * 0.8, 360) / bmp.width, (innerHeight * 0.6) / bmp.height);
+    const dw = bmp.width * f;
+    const dh = bmp.height * f;
+    const dpr = devicePixelRatio || 1;
+    Object.assign(cropStage.style, { width: `${dw}px`, height: `${dh}px` });
+    Object.assign(cropCv, { width: Math.round(dw * dpr), height: Math.round(dh * dpr) });
+    cropCv.getContext('2d').drawImage(bmp, 0, 0, cropCv.width, cropCv.height);
+
+    // 처음엔 들어갈 수 있는 가장 큰 3:4 를 가운데에
+    let w = Math.min(dw, (dh * 3) / 4);
+    let h = (w * 4) / 3;
+    let x = (dw - w) / 2;
+    let y = (dh - h) / 2;
+    const paint = () => Object.assign(cropBox.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
+
     const ac = new AbortController();
     const { signal } = ac;
-    let last = null;
-    cropCv.addEventListener('pointerdown', (e) => { last = e; cropCv.setPointerCapture(e.pointerId); }, { signal });
-    cropCv.addEventListener('pointerup', () => { last = null; }, { signal });
-    cropCv.addEventListener('pointermove', (e) => {
-      if (!last) return;
-      const k = IMG_W / cropCv.clientWidth;
-      x += (e.clientX - last.clientX) * k;
-      y += (e.clientY - last.clientY) * k;
-      last = e;
-      draw();
+    let drag = null;
+    const at = (e) => { const r = cropStage.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    cropStage.addEventListener('pointerdown', (e) => {
+      const corner = e.target.dataset?.h;
+      if (!corner && !cropBox.contains(e.target)) return;
+      const [px, py] = at(e);
+      const east = corner?.endsWith('e');
+      const south = corner?.startsWith('s');
+      // 크기 조절은 반대쪽 모서리를 고정점으로
+      drag = corner ? { corner, east, south, ax: east ? x : x + w, ay: south ? y : y + h } : { ox: px - x, oy: py - y };
+      cropStage.setPointerCapture(e.pointerId);
     }, { signal });
-    cropZoom.addEventListener('input', () => {
-      // 화면 가운데를 기준으로 확대
-      const fx = (IMG_W / 2 - x) / w;
-      const fy = (IMG_H / 2 - y) / h;
-      zoom = +cropZoom.value;
-      [w, h] = size();
-      x = IMG_W / 2 - fx * w;
-      y = IMG_H / 2 - fy * h;
-      draw();
+    cropStage.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const [px, py] = at(e);
+      if (!drag.corner) {
+        x = Math.min(dw - w, Math.max(0, px - drag.ox));
+        y = Math.min(dh - h, Math.max(0, py - drag.oy));
+      } else {
+        const { ax, ay, east, south } = drag;
+        const maxW = Math.min(east ? dw - ax : ax, ((south ? dh - ay : ay) * 3) / 4);
+        w = Math.min(maxW, Math.max(CROP_MIN, Math.abs(px - ax), (Math.abs(py - ay) * 3) / 4));
+        h = (w * 4) / 3;
+        x = east ? ax : ax - w;
+        y = south ? ay : ay - h;
+      }
+      paint();
     }, { signal });
+    cropStage.addEventListener('pointerup', () => { drag = null; }, { signal });
+    cropStage.addEventListener('pointercancel', () => { drag = null; }, { signal });
     cropDlg.addEventListener('close', () => {
       ac.abort();
-      resolve(cropDlg.returnValue === 'ok' ? cropCv.toDataURL('image/jpeg', 0.85) : null);
+      if (cropDlg.returnValue !== 'ok') return resolve(null);
+      const out = Object.assign(document.createElement('canvas'), { width: IMG_W, height: IMG_H });
+      out.getContext('2d').drawImage(bmp, x / f, y / f, w / f, h / f, 0, 0, IMG_W, IMG_H);
+      resolve(out.toDataURL('image/jpeg', 0.85));
     }, { signal });
-    cropZoom.value = '1';
+
     cropCount.textContent = count;
     cropDlg.returnValue = '';
-    draw();
+    paint();
     cropDlg.showModal();
   });
 }
