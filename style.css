@@ -46,6 +46,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn { border: 1px solid var(--accent); background: var(--accent); color: #fff; padding: 7px 16px; border-radius: 6px; cursor: pointer; }
 .btn:disabled { opacity: .6; cursor: progress; }
 .btn.ghost { background: transparent; color: var(--accent-text); }
+.btn.pill { border: 0; border-radius: 999px; padding: 4px 12px; font-size: 12px; background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.btn.pill:hover { background: #f1f0ec; }
 .btn.dashed { width: 100%; border-style: dashed; background: transparent; color: var(--accent-text); padding: 12px; }
 .btn.danger { background: transparent; border-color: var(--dislike); color: var(--dislike); }
 
