@@ -141,7 +141,7 @@ const thumb = (src, path, i) =>
   `<div class="thumb"><img src="${src}" alt=""><button class="x" data-rm-img="${path}" data-i="${i}" aria-label="사진 삭제">✕</button></div>`;
 const thumbs = (path) => `<div class="thumbs">${get(path).map((src, i) => thumb(src, path, i)).join('')}${addBtn(path)}</div>`;
 const drop = (path, kind, label) => `<div class="drop ${kind}"><span class="lbl">${label}</span>${thumbs(path)}</div>`;
-const likePair = (base) => `<div class="pair">${drop(`${base}.dislike`, 'dislike', '싫어요')}${drop(`${base}.like`, 'like', '좋아요')}</div>`;
+const likePair = (base, cls = '') => `<div class="pair ${cls}">${drop(`${base}.dislike`, 'dislike', '싫어요')}${drop(`${base}.like`, 'like', '좋아요')}</div>`;
 const card = (id, no, title, body, aside = '') =>
   `<section class="card" id="${id}"><header><span class="no">${no}</span><h2>${title}</h2>${aside}</header>${body}</section>`;
 const delBtn = (list, i) => `<button class="del" data-del="${list}" data-i="${i}" aria-label="삭제">✕</button>`;
@@ -201,8 +201,8 @@ function shotCard() {
   const items = state.shots.map((x, i) => `<div class="shot">
     <div class="shot-h"><input class="in shot-name" data-path="shots.${i}.name" value="${esc(x.name)}" placeholder="컷 ${i + 1}" aria-label="컷 이름">${delBtn('shots', i)}</div>
     ${input(`shots.${i}.place`, '장소')}
-    ${likePair(`shots.${i}`)}
-    <div class="grid">${select(`shots.${i}.hair`, '헤어 변형', 'hair')}${select(`shots.${i}.dress`, '드레스', 'dress')}${select(`shots.${i}.bouquet`, '부케', 'bouquet')}${select(`shots.${i}.boutonniere`, '부토니에', 'boutonniere')}</div></div>`).join('');
+    ${likePair(`shots.${i}`, 'keep')}
+    <div class="grid two">${select(`shots.${i}.hair`, '헤어 변형', 'hair')}${select(`shots.${i}.dress`, '드레스', 'dress')}${select(`shots.${i}.bouquet`, '부케', 'bouquet')}${select(`shots.${i}.boutonniere`, '부토니에', 'boutonniere')}</div></div>`).join('');
   return card('s-shot', 'x', '촬영 시안', `${items}<button class="btn dashed" data-add="shots">+ 촬영 시안 추가</button>`);
 }
 
@@ -211,8 +211,7 @@ const TOC = [['s-basic', '기본정보'], ['s-sched', '일정'], ['s-mu-bride', 
 
 const editorEl = document.getElementById('editor');
 function renderEditor() {
-  editorEl.innerHTML = `<nav class="toc" aria-label="섹션">${TOC.map(([id, l]) => `<a href="#${id}">${l}</a>`).join('')}</nav>
-  <div class="forms">
+  editorEl.innerHTML = `<div class="forms">
     ${basicCard()}${scheduleCard()}
     ${muCard('bride', 'iii', '신부')}${muCard('groom', 'iv', '신랑')}
     ${hairCard('bride', 'v', '신부')}${hairCard('groom', 'vi', '신랑')}
@@ -301,6 +300,18 @@ function show(view) {
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-view]');
   if (b) show(b.dataset.view);
+});
+
+// 목차 팝업: 고르면 입력 화면의 해당 섹션으로 이동 (바깥을 누르면 popover 가 알아서 닫힘)
+const tocEl = document.getElementById('toc');
+tocEl.innerHTML = TOC.map(([id, l]) => `<a href="#${id}">${l}</a>`).join('');
+tocEl.addEventListener('click', (e) => {
+  const a = e.target.closest('a');
+  if (!a) return;
+  e.preventDefault();
+  tocEl.hidePopover();
+  if (document.getElementById('view-edit').hidden) show('edit');
+  document.querySelector(a.getAttribute('href')).scrollIntoView();
 });
 
 document.getElementById('pdf').addEventListener('click', async (e) => {
