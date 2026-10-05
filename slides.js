@@ -6,7 +6,7 @@ const TILE_GAP = 0.5;
 const LABEL_H = 2.6;
 const HAIR_PER_SLIDE = 4;
 const DRESS_PER_SLIDE = 2;
-const ITEM_KINDS = [['dress', 'Dress', '드레스'], ['bouquet', 'Bouquet', '부케'], ['boutonniere', 'Boutonniere', '부토니에']];
+const ITEM_KINDS = [['dress', 'Dress', '드레스'], ['bouquet', 'Bouquet', '부케'], ['boutonniere', 'Boutonniere', '부토니에'], ['props', 'Props', '웨딩 소품']];
 const WEEK = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -98,10 +98,15 @@ function shotSlide(shot, i, s) {
     const x = list.find((d) => d.id === id);
     return x && `<div><dt>${label}</dt><dd>${esc(x.name)}</dd><div class="mini">${x.imgs.slice(0, 3).map((src) => `<img class="tile" src="${src}" alt="">`).join('')}</div></div>`;
   };
+  const pickedMany = (list, ids, label) => {
+    const xs = list.filter((d) => ids.includes(d.id));
+    return xs.length > 0 && `<div><dt>${label}</dt><dd>${xs.map((x) => esc(x.name)).join(', ')}</dd><div class="mini">${xs.flatMap((x) => x.imgs.slice(0, 1)).slice(0, 3).map((src) => `<img class="tile" src="${src}" alt="">`).join('')}</div></div>`;
+  };
   const meta = [
     shot.place && `<div><dt>장소</dt><dd>${esc(shot.place)}</dd></div>`,
     picked([...s.hair.bride, ...s.hair.groom], shot.hair, '헤어'),
-    ...ITEM_KINDS.map(([key, , ko]) => picked(s[key], shot[key], ko)),
+    ...ITEM_KINDS.filter(([key]) => key !== 'props').map(([key, , ko]) => picked(s[key], shot[key], ko)),
+    pickedMany(s.props, shot.props ?? [], '소품'),
   ].filter(Boolean);
   // ponytail: 4개 이상이면 2열로 접어 세로 넘침 방지
   const isTwoCol = meta.length > 3;

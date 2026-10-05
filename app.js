@@ -9,6 +9,7 @@ const DEFAULT_STATE = {
   dress: [],
   bouquet: [],
   boutonniere: [],
+  props: [],
   shots: [],
   pointColor: '#6d93bd',
 };
@@ -22,7 +23,8 @@ const NEW_ITEM = {
   dress: () => ({ id: uid(), imgs: [], name: '', desc: '' }),
   bouquet: () => ({ id: uid(), imgs: [], name: '', desc: '' }),
   boutonniere: () => ({ id: uid(), imgs: [], name: '', desc: '' }),
-  shots: () => ({ id: uid(), name: '', hair: '', place: '', dress: '', bouquet: '', boutonniere: '', dislike: [], like: [] }),
+  props: () => ({ id: uid(), imgs: [], name: '', desc: '' }),
+  shots: () => ({ id: uid(), name: '', hair: '', place: '', dress: '', bouquet: '', boutonniere: '', props: [], dislike: [], like: [] }),
 };
 
 // ── 불변 경로 갱신 ──
@@ -38,7 +40,7 @@ const merge = (d, s) => (d && typeof d === 'object' && !Array.isArray(d) && s &&
   : s ?? d);
 
 // 목록은 늘 칸 1개 이상 보이게 하고, 빈 칸은 결과·선택지에서 뺌
-const LISTS = ['hair.bride', 'hair.groom', 'dress', 'bouquet', 'boutonniere', 'shots'];
+const LISTS = ['hair.bride', 'hair.groom', 'dress', 'bouquet', 'boutonniere', 'props', 'shots'];
 const newItem = (list) => NEW_ITEM[list.split('.')[0]]();
 const isBlank = (x) => Object.entries(x).every(([k, v]) => k === 'id' || (Array.isArray(v) ? !v.length : !v));
 const withOneEach = (s) => LISTS.reduce((acc, p) => (getIn(acc, p).length ? acc : setIn(acc, toPath(p), [newItem(p)])), s);
@@ -248,6 +250,15 @@ const hairOptions = (sel) => '<option value="">선택 안 함</option>' + [['bri
   .join('');
 const listOptions = (key) => (sel) => '<option value="">선택 안 함</option>' + state[key].filter((d) => !isBlank(d)).map((d) => option(d.id, d.name || '(이름 없음)', sel)).join('');
 const OPTIONS = { hair: hairOptions, dress: listOptions('dress'), bouquet: listOptions('bouquet'), boutonniere: listOptions('boutonniere') };
+// 소품은 여러 개 고르므로 체크박스 칩. 예전 저장본의 촬영 시안엔 props 가 없음
+const propChips = (path) => {
+  const sel = get(path) ?? [];
+  const items = state.props.filter((d) => !isBlank(d));
+  return items.length
+    ? items.map((d) => `<label><input type="checkbox" value="${esc(d.id)}"${sel.includes(d.id) ? ' checked' : ''}>${esc(d.name || '(이름 없음)')}</label>`).join('')
+    : '<span class="none">웨딩 소품을 먼저 추가하세요</span>';
+};
+const multi = (path, label) => `<div class="f"><span>${label}</span><div class="chips" data-multi="${path}">${propChips(path)}</div></div>`;
 const select = (path, label, kind) =>
   `<label class="f">${label}<select class="in" data-path="${path}" data-opts="${kind}">${OPTIONS[kind](get(path))}</select></label>`;
 
@@ -285,8 +296,8 @@ function hairCard(side, no, label) {
   return card(`s-hair-${side}`, no, `헤어 시안 · ${label}`, `${items}<button class="btn dashed" data-add="hair.${side}">+ 헤어 추가</button>`);
 }
 
-// 드레스·부케·부토니에: 사진 여러 장 + 이름 + 설명 목록
-const ITEM_LISTS = [['dress', 'vii', '드레스'], ['bouquet', 'viii', '부케'], ['boutonniere', 'ix', '부토니에']];
+// 드레스·부케·부토니에·소품: 사진 여러 장 + 이름 + 설명 목록
+const ITEM_LISTS = [['dress', 'vii', '드레스'], ['bouquet', 'viii', '부케'], ['boutonniere', 'ix', '부토니에'], ['props', 'x', '웨딩 소품']];
 function listCard([key, no, title]) {
   const items = state[key].map((d, i) => `<div class="item wide">
     <div class="fields">${thumbs(`${key}.${i}.imgs`)}${bare(`${key}.${i}.name`, '이름')}<textarea class="in" data-path="${key}.${i}.desc" placeholder="설명" aria-label="설명">${esc(d.desc)}</textarea></div>
@@ -299,12 +310,13 @@ function shotCard() {
     <div class="shot-h"><input class="in shot-name" data-path="shots.${i}.name" value="${esc(x.name)}" placeholder="컷 ${i + 1}" aria-label="컷 이름">${delBtn('shots', i)}</div>
     ${input(`shots.${i}.place`, '장소')}
     ${likePair(`shots.${i}`)}
-    <div class="grid two">${select(`shots.${i}.hair`, '헤어 변형', 'hair')}${select(`shots.${i}.dress`, '드레스', 'dress')}${select(`shots.${i}.bouquet`, '부케', 'bouquet')}${select(`shots.${i}.boutonniere`, '부토니에', 'boutonniere')}</div></div>`).join('');
-  return card('s-shot', 'x', '촬영 시안', `${items}<button class="btn dashed" data-add="shots">+ 촬영 시안 추가</button>`);
+    <div class="grid two">${select(`shots.${i}.hair`, '헤어 변형', 'hair')}${select(`shots.${i}.dress`, '드레스', 'dress')}${select(`shots.${i}.bouquet`, '부케', 'bouquet')}${select(`shots.${i}.boutonniere`, '부토니에', 'boutonniere')}</div>
+    ${multi(`shots.${i}.props`, '소품 <span class="opt">(여러 개 선택)</span>')}</div>`).join('');
+  return card('s-shot', 'xi', '촬영 시안', `${items}<button class="btn dashed" data-add="shots">+ 촬영 시안 추가</button>`);
 }
 
 const TOC = [['s-basic', '기본정보'], ['s-sched', '일정'], ['s-mu-bride', '메이크업 · 신부'], ['s-mu-groom', '메이크업 · 신랑'],
-  ['s-hair-bride', '헤어 · 신부'], ['s-hair-groom', '헤어 · 신랑'], ['s-dress', '드레스'], ['s-bouquet', '부케'], ['s-boutonniere', '부토니에'], ['s-shot', '촬영 시안']];
+  ['s-hair-bride', '헤어 · 신부'], ['s-hair-groom', '헤어 · 신랑'], ['s-dress', '드레스'], ['s-bouquet', '부케'], ['s-boutonniere', '부토니에'], ['s-props', '웨딩 소품'], ['s-shot', '촬영 시안']];
 
 const editorEl = document.getElementById('editor');
 function renderEditor() {
@@ -322,17 +334,20 @@ function refreshShotSelects() {
   editorEl.querySelectorAll('select[data-opts]').forEach((sel) => {
     sel.innerHTML = OPTIONS[sel.dataset.opts](get(sel.dataset.path));
   });
+  editorEl.querySelectorAll('[data-multi]').forEach((box) => { box.innerHTML = propChips(box.dataset.multi); });
 }
 
 editorEl.addEventListener('input', (e) => {
   const { path } = e.target.dataset;
   if (!path || e.target.type === 'radio' || e.target.tagName === 'SELECT') return;
   update(path, e.target.value);
-  if (/^(hair\.\w+|dress|bouquet|boutonniere)\.\d+\.name$/.test(path)) refreshShotSelects();
+  if (/^(hair\.\w+|dress|bouquet|boutonniere|props)\.\d+\.name$/.test(path)) refreshShotSelects();
 });
 editorEl.addEventListener('change', (e) => {
   const t = e.target;
   if (t.dataset.imgPath) return addImages(t);
+  const box = t.closest('[data-multi]');
+  if (box) return update(box.dataset.multi, [...box.querySelectorAll(':checked')].map((x) => x.value));
   if (t.dataset.path && (t.type === 'radio' || t.tagName === 'SELECT')) update(t.dataset.path, t.value);
   if (t.dataset.path === 'studio.kind') renderEditor();
 });
