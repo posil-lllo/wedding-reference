@@ -311,7 +311,7 @@ function shotCard() {
     ${input(`shots.${i}.place`, '장소')}
     ${likePair(`shots.${i}`)}
     <div class="grid two">${select(`shots.${i}.hair`, '헤어 변형', 'hair')}${select(`shots.${i}.dress`, '드레스', 'dress')}${select(`shots.${i}.bouquet`, '부케', 'bouquet')}${select(`shots.${i}.boutonniere`, '부토니에', 'boutonniere')}</div>
-    ${multi(`shots.${i}.props`, '소품 <span class="opt">(여러 개 선택)</span>')}</div>`).join('');
+    ${multi(`shots.${i}.props`, '소품 <span class="opt">(여러 개 선택 가능)</span>')}</div>`).join('');
   return card('s-shot', 'xi', '촬영 시안', `${items}<button class="btn dashed" data-add="shots">+ 촬영 시안 추가</button>`);
 }
 
