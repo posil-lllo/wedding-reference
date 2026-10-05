@@ -325,7 +325,7 @@ function renderEditor() {
     ${muCard('bride', 'iii', '신부')}${muCard('groom', 'iv', '신랑')}
     ${hairCard('bride', 'v', '신부')}${hairCard('groom', 'vi', '신랑')}
     ${ITEM_LISTS.map(listCard).join('')}${shotCard()}
-    <div class="edit-bar"><button class="btn danger" data-reset>전체 지우기</button><button class="btn" data-view="view">시안 완성하기</button></div>
+    <div class="edit-bar"><button class="btn danger" data-reset>초기화</button><button class="btn" data-view="view">시안 완성하기</button></div>
   </div>`;
 }
 
