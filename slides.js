@@ -102,18 +102,19 @@ function shotSlide(shot, i, s) {
     const xs = list.filter((d) => ids.includes(d.id));
     return xs.length > 0 && `<div><dt>${label}</dt><dd>${xs.map((x) => esc(x.name)).join(', ')}</dd><div class="mini">${xs.flatMap((x) => x.imgs.slice(0, 1)).slice(0, 3).map((src) => `<img class="tile" src="${src}" alt="">`).join('')}</div></div>`;
   };
-  const meta = [
-    shot.place && `<div><dt>장소</dt><dd>${esc(shot.place)}</dd></div>`,
-    picked([...s.hair.bride, ...s.hair.groom], shot.hair, '헤어'),
-    ...ITEM_KINDS.filter(([key]) => key !== 'props').map(([key, , ko]) => picked(s[key], shot[key], ko)),
-    pickedMany(s.props, shot.props ?? [], '소품'),
-  ].filter(Boolean);
-  // ponytail: 4개 이상이면 2열로 접어 세로 넘침 방지
-  const isTwoCol = meta.length > 3;
+  // 장소 / 헤어·드레스 / 부케·부토니에 / 소품 순으로 한 줄씩, 빈 줄은 빼고 혼자인 칸은 줄 전체를 씀
+  const rows = [
+    [shot.place && `<div><dt>장소</dt><dd>${esc(shot.place)}</dd></div>`],
+    [picked([...s.hair.bride, ...s.hair.groom], shot.hair, '헤어 변형'), picked(s.dress, shot.dress, '드레스')],
+    [picked(s.bouquet, shot.bouquet, '부케'), picked(s.boutonniere, shot.boutonniere, '부토니에')],
+    [pickedMany(s.props, shot.props ?? [], '소품')],
+  ].map((r) => r.filter(Boolean)).filter((r) => r.length);
+  const isTwoCol = rows.some((r) => r.length > 1);
   const metaW = isTwoCol ? 30 : 18;
-  const right = BODY_W - (meta.length ? metaW + GAP : 0);
-  const metaHtml = meta.length ? `<dl class="meta${isTwoCol ? ' two' : ''}" style="width:${metaW}cqw">${meta.join('')}</dl>` : '';
-  return titled(`Scene ${pad2(i + 1)}`, '촬영 시안', shot.name || shot.place, metaHtml + likeDislike(shot.like, shot.dislike, right));
+  const right = BODY_W - (rows.length ? metaW + GAP : 0);
+  const cells = rows.flatMap((r) => (r.length > 1 ? r : [r[0].replace('<div>', '<div class="full">')]));
+  const metaHtml = rows.length ? `<dl class="meta${isTwoCol ? ' two' : ''}" style="width:${metaW}cqw">${cells.join('')}</dl>` : '';
+  return titled(`Scene ${pad2(i + 1)}`, `촬영 시안 · ${esc(shot.name || `컷 ${i + 1}`)}`, '', metaHtml + likeDislike(shot.like, shot.dislike, right));
 }
 
 function buildSlides(s) {

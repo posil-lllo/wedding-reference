@@ -205,6 +205,7 @@ textarea.in { min-height: 64px; resize: vertical; }
 .hcard .ds { font-size: 1.15cqw; color: var(--muted); line-height: 1.5; }
 .meta { display: grid; gap: 1.6cqw; align-content: start; margin: 0; flex: none; }
 .meta.two { grid-template-columns: 1fr 1fr; column-gap: 1.6cqw; }
+.meta.two .full { grid-column: 1 / -1; }
 .meta dt { font-size: 1.1cqw; letter-spacing: .08em; color: var(--muted); }
 .meta dd { margin: .2cqw 0 0; font-family: var(--serif); font-size: 1.6cqw; }
 .meta .mini { display: flex; gap: .5cqw; margin-top: .6cqw; }
