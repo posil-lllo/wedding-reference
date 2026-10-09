@@ -47,7 +47,7 @@
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="bgpick">포인트 컬러 <input type="color" id="point-color"><input class="hex" id="point-hex" maxlength="7" spellcheck="false" aria-label="포인트 컬러 코드"></label><button class="btn pill" id="point-reset">색 초기화</button><button class="btn pill" data-view="edit">수정</button></div>
   </div>
   <div class="slides" id="deck"></div>
-  <div class="pdf-bar"><button class="btn" data-export="pdf">PDF 내보내기</button><button class="btn" data-export="ppt">PPT 내보내기</button></div>
+  <div class="pdf-bar"><button class="btn" id="pdf">PDF 내보내기</button></div>
 </main>
 
 <dialog class="crop" id="crop" aria-labelledby="crop-h">
@@ -58,11 +58,10 @@
     <div class="crop-btns"><span id="crop-count"></span><button class="btn soft" value="cancel" id="crop-skip">빼기</button><button class="btn" value="ok" id="crop-ok" autofocus>확인</button></div>
   </form>
 </dialog>
-<div class="overlay" id="overlay" hidden></div>
+<div class="overlay" id="overlay" hidden>PDF 만드는 중…</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="collage.js"></script>
 <script src="slides.js"></script>
 <script src="app.js"></script>

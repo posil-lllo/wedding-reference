@@ -142,37 +142,21 @@ function renderDeck(s) {
     .join('');
 }
 
-// 슬라이드를 1280px 고정 폭으로 캡처해 JPEG data URL 목록으로
-async function captureSlides(deckEl) {
+// 슬라이드를 1280px 고정 폭으로 캡처해 가로 PDF 한 파일로 이어 붙임
+async function exportPdf(deckEl, filename) {
+  const { jsPDF } = window.jspdf;
   await document.fonts.ready;
   deckEl.classList.add('exporting');
   try {
-    const shots = [];
-    for (const el of deckEl.querySelectorAll('.slide')) {
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: [960, 540] });
+    const slides = [...deckEl.querySelectorAll('.slide')];
+    for (const [i, el] of slides.entries()) {
       const canvas = await html2canvas(el, { scale: 1.5, useCORS: true, backgroundColor: null });
-      shots.push(canvas.toDataURL('image/jpeg', 0.92));
+      if (i) pdf.addPage([960, 540], 'landscape');
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 960, 540);
     }
-    return shots;
+    return new File([pdf.output('blob')], filename, { type: 'application/pdf' });
   } finally {
     deckEl.classList.remove('exporting');
   }
-}
-
-// 가로 PDF 한 파일로 이어 붙임
-async function exportPdf(deckEl, filename) {
-  const pdf = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: [960, 540] });
-  (await captureSlides(deckEl)).forEach((src, i) => {
-    if (i) pdf.addPage([960, 540], 'landscape');
-    pdf.addImage(src, 'JPEG', 0, 0, 960, 540);
-  });
-  return new File([pdf.output('blob')], filename, { type: 'application/pdf' });
-}
-
-// ponytail: 슬라이드마다 캡처 이미지 한 장이라 PPT 에서 글자 수정은 안 됨
-async function exportPptx(deckEl, filename) {
-  const pptx = new PptxGenJS();
-  pptx.layout = 'LAYOUT_16x9';
-  (await captureSlides(deckEl)).forEach((data) => pptx.addSlide().addImage({ data, x: 0, y: 0, w: 10, h: 5.625 }));
-  const blob = await pptx.write({ outputType: 'blob' });
-  return new File([blob], filename, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
 }
