@@ -135,6 +135,7 @@ const cropCount = document.getElementById('crop-count');
 const cropOk = document.getElementById('crop-ok');
 const cropX = document.getElementById('crop-x');
 const cropSkip = document.getElementById('crop-skip');
+const cropPrev = document.getElementById('crop-prev');
 const cropForm = cropDlg.querySelector('form');
 const cropLoad = document.getElementById('crop-load');
 const cropLoadMsg = document.getElementById('crop-load-msg');
@@ -151,10 +152,12 @@ cropDlg.addEventListener('cancel', abortCrop);
 // ponytail: cancel 없이 브라우저가 바로 닫는 경우(Chrome 의 Esc 연타)는 다음 사진 추가 때 정리된다
 let cropRun = null;
 
-function setCropStep(i, n, isLoading) {
+function setCropStep(i, n, isLoading, hasPrev = false) {
   cropDlg.classList.toggle('loading', isLoading);
   cropLoad.hidden = !isLoading;
   cropOk.disabled = cropSkip.disabled = isLoading;
+  cropPrev.disabled = isLoading || !hasPrev;
+  cropPrev.hidden = n < 2;
   cropCount.textContent = n > 1 ? `${i + 1} / ${n}` : '';
   cropOk.textContent = i < n - 1 ? '다음' : '확인';
   cropSkip.hidden = n < 2;
@@ -179,9 +182,11 @@ function stageSize(pw, ph) {
   return { f, dw, dh, width: `${dw + 2 * CROP_PAD}px`, height: `${dh + 2 * CROP_PAD}px` };
 }
 // 사진 전체를 화면에 맞춰 보여 주고, 그 위 3:4 박스를 옮기거나 모서리로 크기 조절
-// 확인이면 자를 영역(사진 크기 대비 0~1 비율), 빼기면 null, X·Esc 면 CROP_ABORT
+// 확인이면 자를 영역(사진 크기 대비 0~1 비율), 빼기면 null, 이전이면 CROP_PREV, X·Esc 면 CROP_ABORT
+// init 이 있으면(이전으로 돌아온 사진) 그때 박스 위치로 시작
+const CROP_PREV = Symbol('prev');
 const CROP_GUARD_MS = 400; // 사진이 막 바뀐 직후의 확인은 "다음" 연타로 보고 무시
-function cropImage(bmp, i, n, runSignal) {
+function cropImage(bmp, i, n, runSignal, hasPrev, init) {
   return new Promise((resolve) => {
     const shownAt = performance.now();
     const { dw, dh, width, height } = stageSize(bmp.width, bmp.height);
@@ -191,10 +196,10 @@ function cropImage(bmp, i, n, runSignal) {
     cropCv.getContext('2d').drawImage(bmp, 0, 0, cropCv.width, cropCv.height);
 
     // 처음엔 들어갈 수 있는 가장 큰 3:4 를 가운데에
-    let w = Math.min(dw, (dh * 3) / 4);
+    let w = init ? init.w * dw : Math.min(dw, (dh * 3) / 4);
     let h = (w * 4) / 3;
-    let x = (dw - w) / 2;
-    let y = (dh - h) / 2;
+    let x = init ? init.x * dw : (dw - w) / 2;
+    let y = init ? init.y * dh : (dh - h) / 2;
     const paint = () => Object.assign(cropBox.style, { left: `${x + CROP_PAD}px`, top: `${y + CROP_PAD}px`, width: `${w}px`, height: `${h}px` });
 
     const ac = new AbortController();
@@ -234,12 +239,14 @@ function cropImage(bmp, i, n, runSignal) {
       e.preventDefault();
       if (performance.now() - shownAt < CROP_GUARD_MS) return;
       ac.abort();
-      cropOk.disabled = cropSkip.disabled = true; // 다음 사진이 뜰 때까지 이 사진에 대한 버튼은 막는다
-      resolve(e.submitter?.value === 'ok' ? { x: x / dw, y: y / dh, w: w / dw, h: h / dh } : null);
+      cropOk.disabled = cropSkip.disabled = cropPrev.disabled = true; // 다음 사진이 뜰 때까지 이 사진에 대한 버튼은 막는다
+      const choice = e.submitter?.value;
+      if (choice === 'prev') resolve(CROP_PREV);
+      else resolve(choice === 'ok' ? { x: x / dw, y: y / dh, w: w / dw, h: h / dh } : null);
     }, { signal });
     runSignal.addEventListener('abort', () => { ac.abort(); resolve(CROP_ABORT); }, { signal });
 
-    setCropStep(i, n, false);
+    setCropStep(i, n, false, hasPrev);
     paint();
     if (!cropDlg.open) cropDlg.showModal();
   });
@@ -325,57 +332,54 @@ async function addImages(input) {
   cropRun = run;
   const isAborted = () => run.signal.aborted;
   const n = files.length;
-  const ok = [];
-  const failed = [];
+  const outs = []; // 사진별 잘라 낸 JPEG
+  const rects = []; // 사진별 마지막 박스 위치 (이전으로 돌아왔을 때 복원)
+  const errs = []; // 사진별 읽기 오류
   // 첫 장을 자르는 동안 나머지도 순서대로 미리 읽어 둔다 (wasm 변환이 몰리지 않게 한 장씩)
+  // 이전으로 돌아갈 수 있게 읽은 사진은 끝날 때까지 들고 있다
   let prev = Promise.resolve();
   const jobs = files.map((file) => (prev = prev.then(() => (isAborted() ? {} : readImage(file).then(shrink)))
     .catch((e) => ({ e }))));
+  // 남아 있는 사진 순번. 빼기·읽기 실패는 여기서 지워 진행 표시(2 / 4)의 전체 장수에서도 빠진다
+  const order = files.map((_, i) => i);
   try {
-    for (const [i, file] of files.entries()) {
-      const { bmp, isShrunk, e } = await waitWithSpinner(jobs[i], i, n, file, run.signal);
+    for (let pos = 0; pos < order.length;) {
+      const i = order[pos];
+      const file = files[i];
+      const { bmp, isShrunk, e } = await waitWithSpinner(jobs[i], pos, order.length, file, run.signal);
+      if (isAborted()) return;
       if (e) {
-        const err = errLabel(e);
+        errs[i] = errLabel(e);
         console.error('image read failed', file.name, file.type, e);
-        track('photo_fail', { type: file.type || file.name.split('.').pop(), error: err });
-        failed.push(err);
+        track('photo_fail', { type: file.type || file.name.split('.').pop(), error: errs[i] });
       }
-      if (!bmp || isAborted()) {
-        bmp?.close();
-        if (isAborted()) return;
+      if (!bmp) { order.splice(pos, 1); continue; }
+      const rect = await cropImage(bmp, pos, order.length, run.signal, pos > 0, rects[i]);
+      if (rect === CROP_ABORT || isAborted()) return;
+      if (rect === CROP_PREV) { pos -= 1; continue; }
+      if (!rect) { // 빼기: 마지막 사진이었으면 앞 사진으로 돌아간다
+        order.splice(pos, 1);
+        if (pos === order.length) pos -= 1;
         continue;
       }
-      const rect = await cropImage(bmp, i, n, run.signal);
-      if (rect === CROP_ABORT || isAborted()) {
-        bmp.close();
-        return;
-      }
-      if (!rect) {
-        bmp.close();
-        continue;
-      }
+      rects[i] = rect;
       // 줄여 둔 사진에서 박스가 출력보다 작으면(확대해서 자름) 원본을 다시 읽어 자른다
       const isBlurry = isShrunk && rect.w * bmp.width < IMG_W;
-      if (!isBlurry) {
-        ok.push(toJpeg(bmp, rect));
-        bmp.close();
-        continue;
-      }
-      bmp.close();
-      const full = await waitWithSpinner(readImage(file), i, n, file, run.signal).catch(() => null);
+      const full = isBlurry ? await waitWithSpinner(readImage(file), pos, order.length, file, run.signal).catch(() => null) : null;
       if (isAborted()) return full?.close();
-      if (full) {
-        ok.push(toJpeg(full, rect));
-        full.close();
-      }
+      outs[i] = toJpeg(full || bmp, rect);
+      full?.close();
+      pos += 1;
     }
   } finally {
-    jobs.forEach((j) => j.then((r) => r.bmp?.close())); // 못 쓰고 남은 사진 해제 (이미 닫은 건 다시 닫아도 무해)
+    jobs.forEach((j) => j.then((r) => r.bmp?.close()));
     if (cropRun === run) { // 새 실행이 창을 넘겨받았으면 건드리지 않는다
       cropRun = null;
       if (cropDlg.open) cropDlg.close();
     }
   }
+  const ok = order.map((i) => outs[i]);
+  const failed = errs.filter(Boolean);
   if (ok.length) {
     update(imgPath, [...get(imgPath), ...ok]);
     track('add_photo', { section: section(imgPath), count: ok.length });
