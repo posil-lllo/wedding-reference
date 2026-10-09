@@ -148,7 +148,8 @@ textarea.in { min-height: 64px; resize: vertical; }
 /* 하단 고정 버튼 줄 (입력: 지우기·완성, 미리보기: PDF) */
 .pdf-bar, .edit-bar { position: sticky; bottom: 0; z-index: 5; padding: 12px 0 calc(12px + env(safe-area-inset-bottom)); background: var(--ivory); border-top: 1px solid var(--line); }
 .edit-bar { display: flex; justify-content: space-between; gap: 8px; }
-.pdf-bar .btn { display: block; width: 100%; max-width: 360px; margin: 0 auto; padding: 12px 16px; font-size: 15px; }
+.pdf-bar { display: flex; justify-content: center; gap: 8px; }
+.pdf-bar .btn { display: block; flex: 1; max-width: 360px; padding: 12px 16px; font-size: 15px; }
 .deck-h { display: flex; justify-content: flex-end; align-items: end; gap: 12px; flex-wrap: wrap; }
 .slides { display: grid; gap: 28px; }
 .slide-wrap { display: grid; gap: 6px; }
