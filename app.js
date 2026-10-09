@@ -17,6 +17,10 @@ const IMG_W = 900;
 const IMG_H = 1200;
 const SAVE_DELAY = 400;
 
+// GA4 이벤트. 입력 내용은 보내지 않고 어느 기능을 썼는지만 (경로의 칸 번호도 뺌)
+const track = (name, params = {}) => window.gtag?.('event', name, params);
+const section = (path) => path.replace(/\.\d+/g, '');
+
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const NEW_ITEM = {
   hair: () => ({ id: uid(), imgs: [], name: '', desc: '' }),
@@ -221,7 +225,10 @@ async function addImages(input) {
     if (url === CROP_ABORT) return;
     if (url) ok.push(url);
   }
-  if (ok.length) update(imgPath, [...get(imgPath), ...ok]);
+  if (ok.length) {
+    update(imgPath, [...get(imgPath), ...ok]);
+    track('add_photo', { section: section(imgPath), count: ok.length });
+  }
   renderEditor();
   if (failed) alert(`${failed}장은 열 수 없는 형식이라 건너뛰었어요. (HEIC 사진이면 JPG로 바꿔서 올려 주세요)`);
 }
@@ -347,8 +354,14 @@ editorEl.addEventListener('change', (e) => {
   const t = e.target;
   if (t.dataset.imgPath) return addImages(t);
   const box = t.closest('[data-multi]');
-  if (box) return update(box.dataset.multi, [...box.querySelectorAll(':checked')].map((x) => x.value));
-  if (t.dataset.path && (t.type === 'radio' || t.tagName === 'SELECT')) update(t.dataset.path, t.value);
+  if (box) {
+    track('select_props');
+    return update(box.dataset.multi, [...box.querySelectorAll(':checked')].map((x) => x.value));
+  }
+  if (t.dataset.path && (t.type === 'radio' || t.tagName === 'SELECT')) {
+    update(t.dataset.path, t.value);
+    track('select_option', { field: section(t.dataset.path) });
+  }
   if (t.dataset.path === 'studio.kind') renderEditor();
 });
 editorEl.addEventListener('click', (e) => {
@@ -357,13 +370,16 @@ editorEl.addEventListener('click', (e) => {
   const { add, del, rmImg, i } = b.dataset;
   if (add) {
     update(add, [...get(add), newItem(add)]);
+    track('add_item', { list: add });
   } else if (del) {
     if (!confirm('이 항목을 삭제할까요?')) return;
     const rest = get(del).filter((_, j) => j !== +i);
     update(del, rest.length ? rest : [newItem(del)]);
+    track('delete_item', { list: del });
   } else if ('reset' in b.dataset) {
     if (!confirm('입력한 내용과 사진을 모두 지울까요?')) return;
     state = withOneEach({ ...DEFAULT_STATE, pointColor: state.pointColor });
+    track('reset');
   } else if (rmImg) {
     update(rmImg, get(rmImg).filter((_, j) => j !== +i));
   } else return;
@@ -389,6 +405,7 @@ function setPointColor(c) {
   applyPointColor(c);
 }
 pointPicker.addEventListener('input', () => setPointColor(pointPicker.value));
+pointPicker.addEventListener('change', () => track('change_color'));
 pointHex.addEventListener('input', () => {
   const hex = parseHex(pointHex.value); // 'fffcef', '#fffcef', 'fc0' 모두 받음
   pointHex.setAttribute('aria-invalid', String(!hex));
@@ -411,7 +428,9 @@ function show(view) {
 }
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-view]');
-  if (b) show(b.dataset.view);
+  if (!b) return;
+  show(b.dataset.view);
+  if (b.dataset.view === 'view') track('view_result', { from: b.closest('.edit-bar') ? 'complete_button' : 'tab' });
 });
 
 // 목차 팝업: 고르면 입력 화면의 해당 섹션으로 이동 (바깥을 누르면 popover 가 알아서 닫힘)
@@ -424,6 +443,7 @@ tocEl.addEventListener('click', (e) => {
   tocEl.hidePopover();
   if (document.getElementById('view-edit').hidden) show('edit');
   document.querySelector(a.getAttribute('href')).scrollIntoView();
+  track('toc_jump', { section: a.getAttribute('href').slice(1) });
 });
 
 // iOS Safari 는 blob 다운로드 링크를 열지 못해 WebKitBlobResource 오류가 나므로 공유 시트로 저장
@@ -454,7 +474,9 @@ document.getElementById('pdf').addEventListener('click', async (e) => {
   try {
     const names = [state.basic.groom, state.basic.bride].filter(Boolean).join('_');
     const file = await exportPdf(deckEl, `웨딩촬영레퍼런스${names ? '_' + names : ''}.pdf`);
-    if (!canShareFile(file)) return downloadFile(file);
+    const isShare = Boolean(canShareFile(file));
+    track('export_pdf', { method: isShare ? 'share' : 'download', slides: deckEl.querySelectorAll('.slide').length });
+    if (!isShare) return downloadFile(file);
     try {
       await navigator.share({ files: [file] });
     } catch (err) {
@@ -465,6 +487,7 @@ document.getElementById('pdf').addEventListener('click', async (e) => {
     }
   } catch (err) {
     console.error('pdf export failed', err);
+    track('export_pdf_fail', { error: err?.name || 'unknown' });
     alert('PDF를 만들지 못했어요. 사진 수를 줄이거나 다시 시도해 주세요.');
   } finally {
     btn.disabled = false;
@@ -485,4 +508,7 @@ document.getElementById('pdf').addEventListener('click', async (e) => {
   renderEditor();
 })();
 
-document.getElementById('fb-go').addEventListener('click', () => document.getElementById('fb').hidePopover());
+document.getElementById('fb-go').addEventListener('click', () => {
+  document.getElementById('fb').hidePopover();
+  track('feedback_click');
+});
