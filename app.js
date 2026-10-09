@@ -28,7 +28,7 @@ const NEW_ITEM = {
   bouquet: () => ({ id: uid(), imgs: [], name: '', desc: '' }),
   boutonniere: () => ({ id: uid(), imgs: [], name: '', desc: '' }),
   props: () => ({ id: uid(), imgs: [], name: '', desc: '' }),
-  shots: () => ({ id: uid(), name: '', hair: '', place: '', dress: '', bouquet: '', boutonniere: '', props: [], dislike: [], like: [] }),
+  shots: () => ({ id: uid(), name: '', hairBride: '', hairGroom: '', place: '', dress: '', bouquet: '', boutonniere: '', props: [], dislike: [], like: [] }),
 };
 
 // ── 불변 경로 갱신 ──
@@ -54,6 +54,16 @@ const withoutBlanks = (s) => LISTS.reduce((acc, p) => setIn(acc, toPath(p), getI
 const hairToImgs = (s) => ({
   ...s,
   hair: Object.fromEntries(Object.entries(s.hair).map(([side, list]) => [side, list.map(({ img, ...h }) => ({ ...h, imgs: h.imgs ?? (img ? [img] : []) }))])),
+});
+
+// 예전 저장본의 촬영 시안은 헤어 변형이 신부·신랑 구분 없이 hair 하나였음
+const splitShotHair = (s) => ({
+  ...s,
+  shots: s.shots.map(({ hair, ...x }) => ({
+    ...x,
+    hairBride: x.hairBride ?? (s.hair.bride.some((h) => h.id === hair) ? hair : ''),
+    hairGroom: x.hairGroom ?? (s.hair.groom.some((h) => h.id === hair) ? hair : ''),
+  })),
 });
 
 // 예전 저장본의 '원하는 느낌'은 좋아요 설명으로 옮김
@@ -251,12 +261,8 @@ const card = (id, no, title, body, aside = '') =>
 const delBtn = (list, i) => `<button class="del" data-del="${list}" data-i="${i}" aria-label="삭제">✕</button>`;
 const option = (value, label, sel) => `<option value="${esc(value)}"${value === sel ? ' selected' : ''}>${esc(label)}</option>`;
 
-const hairOptions = (sel) => '<option value="">선택 안 함</option>' + [['bride', '신부'], ['groom', '신랑']]
-  .filter(([side]) => state.hair[side].some((h) => !isBlank(h)))
-  .map(([side, label]) => `<optgroup label="${label}">${state.hair[side].filter((h) => !isBlank(h)).map((h) => option(h.id, h.name || '(이름 없음)', sel)).join('')}</optgroup>`)
-  .join('');
-const listOptions = (key) => (sel) => '<option value="">선택 안 함</option>' + state[key].filter((d) => !isBlank(d)).map((d) => option(d.id, d.name || '(이름 없음)', sel)).join('');
-const OPTIONS = { hair: hairOptions, dress: listOptions('dress'), bouquet: listOptions('bouquet'), boutonniere: listOptions('boutonniere') };
+const listOptions = (key) => (sel) => '<option value="">선택 안 함</option>' + get(key).filter((d) => !isBlank(d)).map((d) => option(d.id, d.name || '(이름 없음)', sel)).join('');
+const OPTIONS = { hairBride: listOptions('hair.bride'), hairGroom: listOptions('hair.groom'), dress: listOptions('dress'), bouquet: listOptions('bouquet'), boutonniere: listOptions('boutonniere') };
 // 소품은 여러 개 고르므로 체크박스 칩. 예전 저장본의 촬영 시안엔 props 가 없음
 const propChips = (path) => {
   const sel = get(path) ?? [];
@@ -317,7 +323,8 @@ function shotCard() {
     <div class="shot-h"><input class="in shot-name" data-path="shots.${i}.name" value="${esc(x.name)}" placeholder="컷 ${i + 1}" aria-label="컷 이름">${delBtn('shots', i)}</div>
     ${input(`shots.${i}.place`, '장소')}
     ${likePair(`shots.${i}`)}
-    <div class="grid two">${select(`shots.${i}.hair`, '헤어 변형', 'hair')}${select(`shots.${i}.dress`, '드레스', 'dress')}${select(`shots.${i}.bouquet`, '부케', 'bouquet')}${select(`shots.${i}.boutonniere`, '부토니에', 'boutonniere')}</div>
+    <div class="grid two">${select(`shots.${i}.hairBride`, '헤어 변형 · 신부', 'hairBride')}${select(`shots.${i}.hairGroom`, '헤어 변형 · 신랑', 'hairGroom')}</div>
+    <div class="grid three">${select(`shots.${i}.dress`, '드레스', 'dress')}${select(`shots.${i}.bouquet`, '부케', 'bouquet')}${select(`shots.${i}.boutonniere`, '부토니에', 'boutonniere')}</div>
     ${multi(`shots.${i}.props`, '소품 <span class="opt">(여러 개 선택 가능)</span>')}</div>`).join('');
   return card('s-shot', 'xi', '촬영 시안', `${items}<button class="btn dashed" data-add="shots">+ 촬영 시안 추가</button>`);
 }
@@ -499,7 +506,7 @@ document.getElementById('pdf').addEventListener('click', async (e) => {
 (async () => {
   try {
     const saved = await idb('readonly', (s) => s.get('current'));
-    if (saved) state = withOneEach(hairToImgs(merge(DEFAULT_STATE, wantToLikeDesc(saved))));
+    if (saved) state = withOneEach(splitShotHair(hairToImgs(merge(DEFAULT_STATE, wantToLikeDesc(saved)))));
   } catch (e) {
     console.error('load failed', e);
     setStatus('저장된 내용을 불러오지 못했어요', true);

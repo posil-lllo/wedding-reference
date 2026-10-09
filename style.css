@@ -130,6 +130,7 @@ textarea.in { min-height: 64px; resize: vertical; }
 .add-img:has(input:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: 2px; }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .grid.two { grid-template-columns: 1fr 1fr; }
+.grid.three { grid-template-columns: repeat(3, 1fr); }
 /* 일정: 이름·(방식|작가|선생님) / 링크 / 시작·종료 */
 .grid.sched { grid-template-columns: 1fr 1fr; }
 .grid.sched > :nth-last-child(3) { grid-column: 1 / -1; }

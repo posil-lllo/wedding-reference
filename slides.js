@@ -102,10 +102,11 @@ function shotSlide(shot, i, s) {
     const xs = list.filter((d) => ids.includes(d.id));
     return xs.length > 0 && `<div><dt>${label}</dt><dd>${xs.map((x) => esc(x.name)).join(', ')}</dd><div class="mini">${xs.flatMap((x) => x.imgs.slice(0, 1)).slice(0, 3).map((src) => `<img class="tile" src="${src}" alt="">`).join('')}</div></div>`;
   };
-  // 장소 / 헤어·드레스 / 부케·부토니에 / 소품 순으로 한 줄씩, 빈 줄은 빼고 혼자인 칸은 줄 전체를 씀
+  // 장소 / 헤어 변형 신부·신랑 / 드레스 / 부케·부토니에 / 소품 순으로 한 줄씩, 빈 줄은 빼고 혼자인 칸은 줄 전체를 씀
   const rows = [
     [shot.place && `<div><dt>장소</dt><dd>${esc(shot.place)}</dd></div>`],
-    [picked([...s.hair.bride, ...s.hair.groom], shot.hair, '헤어 변형'), picked(s.dress, shot.dress, '드레스')],
+    [picked(s.hair.bride, shot.hairBride, '헤어 변형 · 신부'), picked(s.hair.groom, shot.hairGroom, '헤어 변형 · 신랑')],
+    [picked(s.dress, shot.dress, '드레스')],
     [picked(s.bouquet, shot.bouquet, '부케'), picked(s.boutonniere, shot.boutonniere, '부토니에')],
     [pickedMany(s.props, shot.props ?? [], '소품')],
   ].map((r) => r.filter(Boolean)).filter((r) => r.length);
