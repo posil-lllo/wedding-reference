@@ -92,11 +92,11 @@ textarea.in { min-height: 64px; resize: vertical; }
 .chips .none { font-size: 12px; }
 .seg label:has(input:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: -2px; }
 
-.drop { border: 1px dashed var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 8px; background: #fff; }
+.drop { border: 1px dashed var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 8px; background: #fff; grid-template-rows: auto 1fr; } /* 사진 줄이 남는 높이를 받아 설명은 칸 아래에 붙는다 */
 .drop .lbl { font-size: 12px; font-weight: 500; }
 .drop.like .lbl { color: var(--like); }
 .drop.dislike .lbl { color: var(--dislike); }
-.thumbs { display: flex; gap: 6px; flex-wrap: wrap; }
+.thumbs { display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-start; align-content: flex-start; } /* 옆 칸 때문에 높이가 늘어도 3:4 유지 */
 .thumb, .add-img { width: 54px; aspect-ratio: 3 / 4; border-radius: 4px; position: relative; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; display: block; }
 .thumb .x { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: rgb(0 0 0 / .5); color: #fff; font-size: 10px; line-height: 1; cursor: pointer; }

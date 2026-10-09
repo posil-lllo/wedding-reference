@@ -137,13 +137,19 @@ const cropX = document.getElementById('crop-x');
 const cropSkip = document.getElementById('crop-skip');
 const cropForm = cropDlg.querySelector('form');
 const cropLoad = document.getElementById('crop-load');
+const cropLoadMsg = document.getElementById('crop-load-msg');
 const CROP_ABORT = Symbol('abort');
 const abortCrop = (e) => {
   e.preventDefault();
-  if (confirm('선택한 사진이 사라집니다. 닫으시겠습니까?')) cropDlg.close('abort');
+  if (!confirm('선택한 사진이 사라집니다. 닫으시겠습니까?')) return;
+  cropRun?.abort(); // close 이벤트는 늦게 오므로 그 사이 새로 시작한 실행까지 멈추지 않게 여기서 바로 멈춘다
+  cropDlg.close();
 };
 cropX.addEventListener('click', abortCrop);
 cropDlg.addEventListener('cancel', abortCrop);
+// 지금 돌고 있는 addImages 의 취소 신호
+// ponytail: cancel 없이 브라우저가 바로 닫는 경우(Chrome 의 Esc 연타)는 다음 사진 추가 때 정리된다
+let cropRun = null;
 
 function setCropStep(i, n, isLoading) {
   cropDlg.classList.toggle('loading', isLoading);
@@ -152,19 +158,19 @@ function setCropStep(i, n, isLoading) {
   cropCount.textContent = n > 1 ? `${i + 1} / ${n}` : '';
   cropOk.textContent = i < n - 1 ? '다음' : '확인';
   cropSkip.hidden = n < 2;
+  if (!isLoading) cropOk.focus(); // 로딩 중 비활성화로 잃은 포커스를 돌려준다
 }
 // 크기 조절 창을 열어 둔 채 로딩만 보여 준다. 사진 크기를 알면 자르기 화면과 같은 크기로, 모르면 직전 사진 영역 크기로
-function showCropLoading(i, n, size) {
+function showCropLoading(i, n, file, size) {
   const { width, height } = size ? stageSize(size.width, size.height) : cropStage.style;
   Object.assign(cropLoad.style, { width, height });
+  cropLoadMsg.textContent = isHeic(file) ? 'HEIC 사진 변환 중입니다' : '사진을 불러오는 중입니다';
   setCropStep(i, n, true);
   if (!cropDlg.open) cropDlg.showModal();
 }
 const CROP_MIN = 48; // 박스 최소 너비(화면 px)
 const CROP_PAD = 14; // 박스가 사진에 꽉 차도 모서리 핸들이 보이도록 사진 둘레 여백(px)
 
-// 사진 전체를 화면에 맞춰 보여 주고, 그 위 3:4 박스를 옮기거나 모서리로 크기 조절
-// 닫힐 때 확인이면 박스 영역의 data URL, 빼기면 null, X·Esc 면 CROP_ABORT
 // 사진을 화면에 맞추는 배율(f)·크기(dw·dh)와 여백 포함 사진 영역 크기
 function stageSize(pw, ph) {
   const f = Math.min((Math.min(innerWidth * 0.8, 360) - 2 * CROP_PAD) / pw, (innerHeight * 0.6) / ph);
@@ -172,9 +178,13 @@ function stageSize(pw, ph) {
   const dh = ph * f;
   return { f, dw, dh, width: `${dw + 2 * CROP_PAD}px`, height: `${dh + 2 * CROP_PAD}px` };
 }
-function cropImage(bmp, i, n) {
+// 사진 전체를 화면에 맞춰 보여 주고, 그 위 3:4 박스를 옮기거나 모서리로 크기 조절
+// 확인이면 자를 영역(사진 크기 대비 0~1 비율), 빼기면 null, X·Esc 면 CROP_ABORT
+const CROP_GUARD_MS = 400; // 사진이 막 바뀐 직후의 확인은 "다음" 연타로 보고 무시
+function cropImage(bmp, i, n, runSignal) {
   return new Promise((resolve) => {
-    const { f, dw, dh, width, height } = stageSize(bmp.width, bmp.height);
+    const shownAt = performance.now();
+    const { dw, dh, width, height } = stageSize(bmp.width, bmp.height);
     const dpr = devicePixelRatio || 1;
     Object.assign(cropStage.style, { width, height, padding: `${CROP_PAD}px` });
     Object.assign(cropCv, { width: Math.round(dw * dpr), height: Math.round(dh * dpr) });
@@ -222,13 +232,12 @@ function cropImage(bmp, i, n) {
     // 확인·빼기는 창을 닫지 않는다. 다음 사진을 읽는 동안 같은 창에 로딩을 띄우고, 닫기는 addImages 가 한다
     cropForm.addEventListener('submit', (e) => {
       e.preventDefault();
+      if (performance.now() - shownAt < CROP_GUARD_MS) return;
       ac.abort();
-      if (e.submitter?.value !== 'ok') return resolve(null);
-      const out = Object.assign(document.createElement('canvas'), { width: IMG_W, height: IMG_H });
-      out.getContext('2d').drawImage(bmp, x / f, y / f, w / f, h / f, 0, 0, IMG_W, IMG_H);
-      resolve(out.toDataURL('image/jpeg', 0.85));
+      cropOk.disabled = cropSkip.disabled = true; // 다음 사진이 뜰 때까지 이 사진에 대한 버튼은 막는다
+      resolve(e.submitter?.value === 'ok' ? { x: x / dw, y: y / dh, w: w / dw, h: h / dh } : null);
     }, { signal });
-    cropDlg.addEventListener('close', () => { ac.abort(); resolve(CROP_ABORT); }, { signal });
+    runSignal.addEventListener('abort', () => { ac.abort(); resolve(CROP_ABORT); }, { signal });
 
     setCropStep(i, n, false);
     paint();
@@ -236,8 +245,8 @@ function cropImage(bmp, i, n) {
   });
 }
 
-// 맥·윈도우 Chrome 등은 HEIC 를 못 읽는다. 그때만 변환 라이브러리(전송 약 650KB)를 받아 읽는다
-const HEIC_LIB = 'https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/heic-to.js';
+// 맥·윈도우 Chrome 등은 HEIC 를 못 읽는다. 그때만 변환 라이브러리(약 3MB, 압축 전송)를 받아 읽는다
+const HEIC_LIB = './vendor/heic-to.js'; // heic-to@1.5.2 (LGPL-3.0, vendor/heic-to.LICENSE). 외부 CDN 코드가 이 페이지 권한으로 돌지 않게 같은 출처에 둔다
 const isHeic = (file) => /^image\/hei[cf]/.test(file.type) || /\.hei[cf]$/i.test(file.name);
 let heicLib;
 const loadHeic = () => (heicLib ||= import(HEIC_LIB).catch((e) => { heicLib = null; throw e; }));
@@ -258,22 +267,29 @@ async function heicSize(file) {
   for (let k = at([...'ispe'], 0); k >= 0; k = at([...'ispe'], k + 4)) { // 타일·썸네일도 있어 가장 큰 것이 원본
     const w = v.getUint32(k + 8);
     const h = v.getUint32(k + 12);
-    if (!best || w * h > best.width * best.height) best = { width: w, height: h };
+    if (w && h && (!best || w * h > best.width * best.height)) best = { width: w, height: h };
   }
   const r = at([...'irot'], 0);
   if (best && r >= 0 && b[r + 4] & 1) best = { width: best.height, height: best.width };
   return best;
 }
-// 미리 읽어 둔 사진이 장당 원본 약 48MB(12MP)씩 메모리를 잡지 않게 긴 변을 줄인다
-// 1600 이면 기본 3:4 박스(가로 사진 기준 가장 좁음)가 출력 900×1200 을 그대로 채운다
+// 미리 읽어 둔 사진이 장당 원본 약 48MB(12MP)씩 메모리를 잡지 않게 긴 변을 줄여 들고 있는다
+// 1600 이면 기본 3:4 박스가 출력 900×1200 을 채운다. 박스를 줄여 확대했을 때만 원본을 다시 읽어 자른다
 const DECODE_MAX = 1600;
 async function shrink(bmp) {
   const k = DECODE_MAX / Math.max(bmp.width, bmp.height);
-  if (k >= 1) return bmp;
-  const small = await createImageBitmap(bmp, { resizeWidth: Math.round(bmp.width * k), resizeHeight: Math.round(bmp.height * k), resizeQuality: 'high' });
-  bmp.close();
-  return small;
+  if (k >= 1) return { bmp, isShrunk: false };
+  try {
+    return { bmp: await createImageBitmap(bmp, { resizeWidth: Math.round(bmp.width * k), resizeHeight: Math.round(bmp.height * k), resizeQuality: 'high' }), isShrunk: true };
+  } finally {
+    bmp.close();
+  }
 }
+const toJpeg = (src, r) => {
+  const out = Object.assign(document.createElement('canvas'), { width: IMG_W, height: IMG_H });
+  out.getContext('2d').drawImage(src, r.x * src.width, r.y * src.height, r.w * src.width, r.h * src.height, 0, 0, IMG_W, IMG_H);
+  return out.toDataURL('image/jpeg', 0.85);
+};
 async function readImage(file) {
   const options = { imageOrientation: 'from-image' };
   try {
@@ -285,44 +301,81 @@ async function readImage(file) {
   }
 }
 
+const SPIN_DELAY_MS = 150; // 이보다 빨리 끝나면 로딩을 띄우지 않는다 (Safari 처럼 바로 읽는 경우 깜빡임 방지)
+// 끝날 때까지 기다리되, 오래 걸리면 크기 조절 창에 로딩을 띄운다
+async function waitWithSpinner(p, i, n, file, signal) {
+  let isDone = false;
+  p.then(() => { isDone = true; }, () => { isDone = true; });
+  await Promise.race([p.catch(() => {}), new Promise((r) => setTimeout(r, SPIN_DELAY_MS))]);
+  if (!isDone) {
+    const size = isHeic(file) ? await heicSize(file).catch(() => null) : null;
+    if (!isDone && !signal.aborted) showCropLoading(i, n, file, size); // 기다리는 사이 닫혔으면 다시 열지 않는다
+  }
+  return p;
+}
+const errLabel = (e) => (e?.message ? `${e.name}: ${e.message}` : String(e)).slice(0, 100);
+
 async function addImages(input) {
   const files = [...input.files];
   const { imgPath } = input.dataset;
   input.value = '';
   if (!files.length) return;
-  cropDlg.returnValue = '';
+  cropRun?.abort();
+  const run = new AbortController();
+  cropRun = run;
+  const isAborted = () => run.signal.aborted;
+  const n = files.length;
   const ok = [];
   const failed = [];
   // 첫 장을 자르는 동안 나머지도 순서대로 미리 읽어 둔다 (wasm 변환이 몰리지 않게 한 장씩)
   let prev = Promise.resolve();
-  let isCancelled = false;
-  const jobs = files.map((file) => {
-    const job = { isDone: false };
-    job.res = prev.then(() => (isCancelled ? null : readImage(file))).then((bmp) => bmp && shrink(bmp)).then((bmp) => ({ bmp }), (e) => ({ e })).finally(() => { job.isDone = true; });
-    prev = job.res;
-    return job;
-  });
-  const closeRest = (from) => (isCancelled = true) && jobs.slice(from).forEach((j) => j.res.then((r) => r.bmp?.close()));
-  for (const [i, file] of files.entries()) {
-    const job = jobs[i];
-    if (!job.isDone && isHeic(file)) showCropLoading(i, files.length, await heicSize(file).catch(() => null));
-    const { bmp, e } = await job.res;
-    if (e) {
-      const err = e?.name || String(e);
-      console.error('image read failed', file.name, file.type, e);
-      track('photo_fail', { type: file.type || file.name.split('.').pop(), error: err });
-      failed.push(err);
+  const jobs = files.map((file) => (prev = prev.then(() => (isAborted() ? {} : readImage(file).then(shrink)))
+    .catch((e) => ({ e }))));
+  try {
+    for (const [i, file] of files.entries()) {
+      const { bmp, isShrunk, e } = await waitWithSpinner(jobs[i], i, n, file, run.signal);
+      if (e) {
+        const err = errLabel(e);
+        console.error('image read failed', file.name, file.type, e);
+        track('photo_fail', { type: file.type || file.name.split('.').pop(), error: err });
+        failed.push(err);
+      }
+      if (!bmp || isAborted()) {
+        bmp?.close();
+        if (isAborted()) return;
+        continue;
+      }
+      const rect = await cropImage(bmp, i, n, run.signal);
+      if (rect === CROP_ABORT || isAborted()) {
+        bmp.close();
+        return;
+      }
+      if (!rect) {
+        bmp.close();
+        continue;
+      }
+      // 줄여 둔 사진에서 박스가 출력보다 작으면(확대해서 자름) 원본을 다시 읽어 자른다
+      const isBlurry = isShrunk && rect.w * bmp.width < IMG_W;
+      if (!isBlurry) {
+        ok.push(toJpeg(bmp, rect));
+        bmp.close();
+        continue;
+      }
+      bmp.close();
+      const full = await waitWithSpinner(readImage(file), i, n, file, run.signal).catch(() => null);
+      if (isAborted()) return full?.close();
+      if (full) {
+        ok.push(toJpeg(full, rect));
+        full.close();
+      }
     }
-    const url = cropDlg.returnValue === 'abort' ? CROP_ABORT // 변환 중에 X·Esc 로 닫음
-      : bmp ? await cropImage(bmp, i, files.length) : null;
-    bmp?.close();
-    if (url === CROP_ABORT) {
-      closeRest(i + 1);
-      return;
+  } finally {
+    jobs.forEach((j) => j.then((r) => r.bmp?.close())); // 못 쓰고 남은 사진 해제 (이미 닫은 건 다시 닫아도 무해)
+    if (cropRun === run) { // 새 실행이 창을 넘겨받았으면 건드리지 않는다
+      cropRun = null;
+      if (cropDlg.open) cropDlg.close();
     }
-    if (url) ok.push(url);
   }
-  if (cropDlg.open) cropDlg.close();
   if (ok.length) {
     update(imgPath, [...get(imgPath), ...ok]);
     track('add_photo', { section: section(imgPath), count: ok.length });
