@@ -121,6 +121,12 @@ textarea.in { min-height: 64px; resize: vertical; }
 .crop-box [data-h="ne"] { top: -3px; right: -3px; border-width: 3px 3px 0 0; cursor: nesw-resize; }
 .crop-box [data-h="sw"] { bottom: -3px; left: -3px; border-width: 0 0 3px 3px; cursor: nesw-resize; }
 .crop-box [data-h="se"] { bottom: -3px; right: -3px; border-width: 0 3px 3px 0; cursor: nwse-resize; }
+.crop.loading .crop-stage { display: none; }
+.crop-load { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-width: 240px; min-height: 240px; margin: 0 auto 14px; color: var(--muted); font-size: 13px; }
+.crop-load[hidden] { display: none; }
+.spin { width: 32px; height: 32px; border: 3px solid rgb(0 0 0 / .1); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } }
 .crop-btns { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .crop-btns .btn { padding: 5px 14px; font-size: 13px; }
 .fb-btns { margin-top: 14px; }

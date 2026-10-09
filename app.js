@@ -135,19 +135,48 @@ const cropCount = document.getElementById('crop-count');
 const cropOk = document.getElementById('crop-ok');
 const cropX = document.getElementById('crop-x');
 const cropSkip = document.getElementById('crop-skip');
+const cropForm = cropDlg.querySelector('form');
+const cropLoad = document.getElementById('crop-load');
 const CROP_ABORT = Symbol('abort');
+const abortCrop = (e) => {
+  e.preventDefault();
+  if (confirm('선택한 사진이 사라집니다. 닫으시겠습니까?')) cropDlg.close('abort');
+};
+cropX.addEventListener('click', abortCrop);
+cropDlg.addEventListener('cancel', abortCrop);
+
+function setCropStep(i, n, isLoading) {
+  cropDlg.classList.toggle('loading', isLoading);
+  cropLoad.hidden = !isLoading;
+  cropOk.disabled = cropSkip.disabled = isLoading;
+  cropCount.textContent = n > 1 ? `${i + 1} / ${n}` : '';
+  cropOk.textContent = i < n - 1 ? '다음' : '확인';
+  cropSkip.hidden = n < 2;
+}
+// 크기 조절 창을 열어 둔 채 로딩만 보여 준다. 사진 크기를 알면 자르기 화면과 같은 크기로, 모르면 직전 사진 영역 크기로
+function showCropLoading(i, n, size) {
+  const { width, height } = size ? stageSize(size.width, size.height) : cropStage.style;
+  Object.assign(cropLoad.style, { width, height });
+  setCropStep(i, n, true);
+  if (!cropDlg.open) cropDlg.showModal();
+}
 const CROP_MIN = 48; // 박스 최소 너비(화면 px)
 const CROP_PAD = 14; // 박스가 사진에 꽉 차도 모서리 핸들이 보이도록 사진 둘레 여백(px)
 
 // 사진 전체를 화면에 맞춰 보여 주고, 그 위 3:4 박스를 옮기거나 모서리로 크기 조절
 // 닫힐 때 확인이면 박스 영역의 data URL, 빼기면 null, X·Esc 면 CROP_ABORT
+// 사진을 화면에 맞추는 배율(f)·크기(dw·dh)와 여백 포함 사진 영역 크기
+function stageSize(pw, ph) {
+  const f = Math.min((Math.min(innerWidth * 0.8, 360) - 2 * CROP_PAD) / pw, (innerHeight * 0.6) / ph);
+  const dw = pw * f;
+  const dh = ph * f;
+  return { f, dw, dh, width: `${dw + 2 * CROP_PAD}px`, height: `${dh + 2 * CROP_PAD}px` };
+}
 function cropImage(bmp, i, n) {
   return new Promise((resolve) => {
-    const f = Math.min((Math.min(innerWidth * 0.8, 360) - 2 * CROP_PAD) / bmp.width, (innerHeight * 0.6) / bmp.height);
-    const dw = bmp.width * f;
-    const dh = bmp.height * f;
+    const { f, dw, dh, width, height } = stageSize(bmp.width, bmp.height);
     const dpr = devicePixelRatio || 1;
-    Object.assign(cropStage.style, { width: `${dw + 2 * CROP_PAD}px`, height: `${dh + 2 * CROP_PAD}px`, padding: `${CROP_PAD}px` });
+    Object.assign(cropStage.style, { width, height, padding: `${CROP_PAD}px` });
     Object.assign(cropCv, { width: Math.round(dw * dpr), height: Math.round(dh * dpr) });
     cropCv.getContext('2d').drawImage(bmp, 0, 0, cropCv.width, cropCv.height);
 
@@ -190,29 +219,70 @@ function cropImage(bmp, i, n) {
     }, { signal });
     cropStage.addEventListener('pointerup', () => { drag = null; }, { signal });
     cropStage.addEventListener('pointercancel', () => { drag = null; }, { signal });
-    cropDlg.addEventListener('close', () => {
+    // 확인·빼기는 창을 닫지 않는다. 다음 사진을 읽는 동안 같은 창에 로딩을 띄우고, 닫기는 addImages 가 한다
+    cropForm.addEventListener('submit', (e) => {
+      e.preventDefault();
       ac.abort();
-      if (cropDlg.returnValue === 'abort') return resolve(CROP_ABORT);
-      if (cropDlg.returnValue !== 'ok') return resolve(null);
+      if (e.submitter?.value !== 'ok') return resolve(null);
       const out = Object.assign(document.createElement('canvas'), { width: IMG_W, height: IMG_H });
       out.getContext('2d').drawImage(bmp, x / f, y / f, w / f, h / f, 0, 0, IMG_W, IMG_H);
       resolve(out.toDataURL('image/jpeg', 0.85));
     }, { signal });
+    cropDlg.addEventListener('close', () => { ac.abort(); resolve(CROP_ABORT); }, { signal });
 
-    const abort = (e) => {
-      e.preventDefault();
-      if (confirm('선택한 사진이 사라집니다. 닫으시겠습니까?')) cropDlg.close('abort');
-    };
-    cropX.addEventListener('click', abort, { signal });
-    cropDlg.addEventListener('cancel', abort, { signal });
-
-    cropCount.textContent = n > 1 ? `${i + 1} / ${n}` : '';
-    cropOk.textContent = i < n - 1 ? '다음' : '확인';
-    cropSkip.hidden = n < 2;
-    cropDlg.returnValue = '';
+    setCropStep(i, n, false);
     paint();
-    cropDlg.showModal();
+    if (!cropDlg.open) cropDlg.showModal();
   });
+}
+
+// 맥·윈도우 Chrome 등은 HEIC 를 못 읽는다. 그때만 변환 라이브러리(전송 약 650KB)를 받아 읽는다
+const HEIC_LIB = 'https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/heic-to.js';
+const isHeic = (file) => /^image\/hei[cf]/.test(file.type) || /\.hei[cf]$/i.test(file.name);
+let heicLib;
+const loadHeic = () => (heicLib ||= import(HEIC_LIB).catch((e) => { heicLib = null; throw e; }));
+// 64×64 HEIC (libheif 가 이보다 작은 건 못 읽음). 사진 고르는 동안 이걸로 HEIC 지원 여부를 보고, 못 읽는 브라우저면 라이브러리를 받아 wasm 까지 데워 둔다
+const TINY_HEIC = 'data:image/heic;base64,AAAAJGZ0eXBoZWljAAAAAG1pZjFNaVBybWlhZk1pSEJoZWljAAABwm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAHBpY3QAAAAAAAAAAAAAAAAAAAAAJGRpbmYAAAAcZHJlZgAAAAAAAAABAAAADHVybCAAAAABAAAADnBpdG0AAAAAAAEAAAA4aWluZgAAAAAAAgAAABVpbmZlAgAAAAABAABodmMxAAAAABVpbmZlAgAAAQACAABFeGlmAAAAABppcmVmAAAAAAAAAA5jZHNjAAIAAQABAAAA5WlwcnAAAADEaXBjbwAAABNjb2xybmNseAACAAIABoAAAAAMY2xsaQDLAEAAAAAUaXNwZQAAAAAAAABAAAAAQAAAAAlpcm90AAAAABBwaXhpAAAAAAMICAgAAABwaHZjQwEDcAAAALAAAAAAAB7wAPz9+PgAAAsDoAABABdAAQwB//8DcAAAAwCwAAADAAADAB5wJKEAAQAiQgEBA3AAAAMAsAAAAwAAAwAeoBQgQcGPiHuRZVNwICBgCKIAAQAJRAHAYXLIQFMkAAAAGWlwbWEAAAAAAAAAAQABBoECA4QFhgAAACxpbG9jAAAAAEQAAAIAAQAAAAEAAAJEAAADGwACAAAAAQAAAfYAAABOAAAAAW1kYXQAAAAAAAADeQAAAAZFeGlmAABNTQAqAAAACAABh2kABAAAAAEAAAAaAAAAAAADoAEAAwAAAAEAAQAAoAIABAAAAAEAAABAoAMABAAAAAEAAABAAAAAAAAAAxcoAa+hOkgat6OR8c28t2GMoP1ioeaf00Q0yYbrxQA5qoxwavDhfcPKvrN/oTFgtycGdOev2ttP14O5l09y1NVAzBhZj5BJGDj7UYXPFN4bnrtQs64bHMBq1m/iss6g6Dv4BjGtYG+Vrn4HGgPe36k6DNSm/5KiZUaeMGxwqO3hn8wlOp6U+lrWo3ICtQGpCBPCNX8WO26/8H1eUp2u1j5RUzIZj/ovoqtVDpT5kTIoaQ8HT+cSLNIaQnoz/C/+jedO6iCfx3usTnuJhOMTuB5PQE5BBOXwKiC46Afbnvsz30qPitfVqu/gp05brd1h7xH9uw2KBYGJXsJY+92Ckj8Z/OCoJ6ZpA1bwJRBJyzW4NGKrJ5zpfQgx/Kuv1659TdUr+LmN+TQOtO/mHj1/lyBt1vwHR2MPq7h7HqgWjFOJ9KPkMHbY+qsrid72+12Uu1DYxCoek30dtGr/o6n4gl2eY+weX6s38/1wxyBRfvF0sMssPlUAkQtImxq7NSO/5Bw7SKAf66VPmDiTEZii05tElmYH4XTifZVR436sMff//+yB/8Snf+eCIz+gGQzW2rqzP+6vKXxbdPVkw00f/2hZczTCdphyWvqy0RdB2oP7QQeX47zenCjKwEVg9HS48HScBS2AvJketVv8F629QJJUPz5HA8mtS8VWHp4PhRWC55GYwttVSlwekuxsY0SHMrgTKP2Fvo55z1x3aUIzkC8tDpC28R+jmnfLnybq6Url40P48TW24yEMs6MJfHBCHOv2odeU4azG08gxnzd0Ct/MLdzxDfC4RKwUwcsBxyWVhvmDFy2nqZR7r9L2KsQLY2XTun7c5VJEAy6c9Rkv4RaEeDGy6qhNs43hnxKlJxKbRX1wGM9PncebPebNuch9Vi9ROpZNiB5pllAAMkYuJQ1D+noyAdSF9zQVeFDscR6KUMS8xmkz1tJ6fXjHCRVW0NrSU7aKHAc2eeklS39Mct+NAsUI2fIBaTcKS28XSsWdCeinneXPJoCzWhylsTP5Ganm4LbRUM//eCq00Cn2AKUBK3JjU+PN4A==';
+let heicWarm;
+const warmHeic = () => (heicWarm ||= fetch(TINY_HEIC).then((r) => r.blob()).then((blob) =>
+  createImageBitmap(blob).then((b) => b.close(), async () => {
+    const { heicTo } = await loadHeic();
+    (await heicTo({ blob, type: 'bitmap' })).close();
+  })).catch((e) => console.warn('heic warm-up failed', e)));
+// HEIC 앞부분의 ispe(가로·세로)·irot(회전) 상자만 훑어 사진 크기를 미리 안다. 변환 전 로딩 창 크기를 맞추는 데만 쓴다
+async function heicSize(file) {
+  const b = new Uint8Array(await file.slice(0, 1 << 16).arrayBuffer());
+  const v = new DataView(b.buffer);
+  const at = (tag, from) => b.findIndex((_, k) => k >= from && tag.every((c, j) => b[k + j] === c.charCodeAt(0)));
+  let best = null;
+  for (let k = at([...'ispe'], 0); k >= 0; k = at([...'ispe'], k + 4)) { // 타일·썸네일도 있어 가장 큰 것이 원본
+    const w = v.getUint32(k + 8);
+    const h = v.getUint32(k + 12);
+    if (!best || w * h > best.width * best.height) best = { width: w, height: h };
+  }
+  const r = at([...'irot'], 0);
+  if (best && r >= 0 && b[r + 4] & 1) best = { width: best.height, height: best.width };
+  return best;
+}
+// 미리 읽어 둔 사진이 장당 원본 약 48MB(12MP)씩 메모리를 잡지 않게 긴 변을 줄인다
+// 1600 이면 기본 3:4 박스(가로 사진 기준 가장 좁음)가 출력 900×1200 을 그대로 채운다
+const DECODE_MAX = 1600;
+async function shrink(bmp) {
+  const k = DECODE_MAX / Math.max(bmp.width, bmp.height);
+  if (k >= 1) return bmp;
+  const small = await createImageBitmap(bmp, { resizeWidth: Math.round(bmp.width * k), resizeHeight: Math.round(bmp.height * k), resizeQuality: 'high' });
+  bmp.close();
+  return small;
+}
+async function readImage(file) {
+  const options = { imageOrientation: 'from-image' };
+  try {
+    return await createImageBitmap(file, options);
+  } catch (e) {
+    if (!isHeic(file)) throw e;
+    const { heicTo } = await loadHeic();
+    return heicTo({ blob: file, type: 'bitmap', options });
+  }
 }
 
 async function addImages(input) {
@@ -220,27 +290,45 @@ async function addImages(input) {
   const { imgPath } = input.dataset;
   input.value = '';
   if (!files.length) return;
+  cropDlg.returnValue = '';
   const ok = [];
-  let failed = 0;
+  const failed = [];
+  // 첫 장을 자르는 동안 나머지도 순서대로 미리 읽어 둔다 (wasm 변환이 몰리지 않게 한 장씩)
+  let prev = Promise.resolve();
+  let isCancelled = false;
+  const jobs = files.map((file) => {
+    const job = { isDone: false };
+    job.res = prev.then(() => (isCancelled ? null : readImage(file))).then((bmp) => bmp && shrink(bmp)).then((bmp) => ({ bmp }), (e) => ({ e })).finally(() => { job.isDone = true; });
+    prev = job.res;
+    return job;
+  });
+  const closeRest = (from) => (isCancelled = true) && jobs.slice(from).forEach((j) => j.res.then((r) => r.bmp?.close()));
   for (const [i, file] of files.entries()) {
-    let bmp;
-    try {
-      bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
-    } catch {
-      failed += 1;
-      continue;
+    const job = jobs[i];
+    if (!job.isDone && isHeic(file)) showCropLoading(i, files.length, await heicSize(file).catch(() => null));
+    const { bmp, e } = await job.res;
+    if (e) {
+      const err = e?.name || String(e);
+      console.error('image read failed', file.name, file.type, e);
+      track('photo_fail', { type: file.type || file.name.split('.').pop(), error: err });
+      failed.push(err);
     }
-    const url = await cropImage(bmp, i, files.length);
-    bmp.close();
-    if (url === CROP_ABORT) return;
+    const url = cropDlg.returnValue === 'abort' ? CROP_ABORT // 변환 중에 X·Esc 로 닫음
+      : bmp ? await cropImage(bmp, i, files.length) : null;
+    bmp?.close();
+    if (url === CROP_ABORT) {
+      closeRest(i + 1);
+      return;
+    }
     if (url) ok.push(url);
   }
+  if (cropDlg.open) cropDlg.close();
   if (ok.length) {
     update(imgPath, [...get(imgPath), ...ok]);
     track('add_photo', { section: section(imgPath), count: ok.length });
   }
   renderEditor();
-  if (failed) alert(`${failed}장은 열 수 없는 형식이라 건너뛰었어요. (HEIC 사진이면 JPG로 바꿔서 올려 주세요)`);
+  if (failed.length) alert(`${failed.length}장은 사진을 읽지 못해 건너뛰었어요. JPG·PNG로 바꿔서 다시 올려 주세요.\n(오류: ${[...new Set(failed)].join(', ')})`);
 }
 
 // ── 입력 화면 마크업 ──
@@ -357,6 +445,9 @@ editorEl.addEventListener('input', (e) => {
   update(path, e.target.value);
   if (/^(hair\.\w+|dress|bouquet|boutonniere|props)\.\d+\.name$/.test(path)) refreshShotSelects();
 });
+const warmOnAdd = (e) => e.target.closest?.('.add-img') && warmHeic();
+editorEl.addEventListener('pointerdown', warmOnAdd);
+editorEl.addEventListener('focusin', warmOnAdd);
 editorEl.addEventListener('change', (e) => {
   const t = e.target;
   if (t.dataset.imgPath) return addImages(t);
