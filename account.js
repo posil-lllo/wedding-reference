@@ -343,14 +343,18 @@ const setNickMsg = (text) => {
   profileForm.nickname.toggleAttribute('aria-invalid', Boolean(text));
 };
 profileForm.nickname.addEventListener('input', () => setNickMsg(''));
+const wdRange = document.getElementById('wd-range');
+const wdPicker = datePicker(document.getElementById('wd-btn'), document.getElementById('wd-cal'), (v) => { wdRange.hidden = !v; });
 
 const showNickname = () => { document.getElementById('my-name').textContent = profile.nickname; };
 async function ensureProfile(ask) {
-  profile = must(await sb.from('profiles').select('nickname,role,character').maybeSingle());
+  profile = must(await sb.from('profiles').select('nickname,role,character,wedding_date,wedding_date_range').maybeSingle());
   if (profile?.nickname && profile.role) return showNickname();
   if (!ask) return;
   profileForm.nickname.value = profile?.nickname || '';
   if (profile?.role) profileForm.role.value = profile.role;
+  wdPicker.value = profile?.wedding_date;
+  profileForm.wdRange.value = String(profile?.wedding_date_range ?? 0);
   profileDlg.showModal();
 }
 profileDlg.addEventListener('cancel', (e) => e.preventDefault()); // Esc 로 닫히지 않게
@@ -362,11 +366,15 @@ profileForm.addEventListener('submit', async (e) => {
     setNickMsg('닉네임을 입력해 주세요.');
     return profileForm.nickname.focus();
   }
-  const btn = profileForm.querySelector('button');
+  const btn = profileForm.querySelector('.onboard-go');
   btn.disabled = true;
   profileErr.hidden = true;
   try {
-    profile = must(await sb.from('profiles').upsert({ user_id: user.id, nickname, role }).select('nickname,role,character').single());
+    profile = must(await sb.from('profiles').upsert({
+      user_id: user.id, nickname, role,
+      wedding_date: wdPicker.value || null,
+      wedding_date_range: wdPicker.value ? Number(profileForm.wdRange.value) : null, // 오차(개월), 0 은 정확한 날짜
+    }).select('nickname,role,character,wedding_date,wedding_date_range').single());
     profileDlg.close();
     showNickname();
     track('profile_done', { role });

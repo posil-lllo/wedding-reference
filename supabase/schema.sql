@@ -52,3 +52,7 @@ revoke all on public.profiles from anon;
 grant select, insert, update on public.profiles to authenticated;
 -- 닉네임은 사용자끼리 겹치지 않음 (영문 대소문자는 같은 것으로 봄)
 create unique index profiles_nickname_key on public.profiles (lower(nickname));
+-- 결혼 예정일. wedding_date_range 는 날짜 오차(개월), 0 은 정확한 날짜
+alter table public.profiles
+  add column wedding_date date,
+  add column wedding_date_range smallint check (wedding_date_range in (0, 1, 3));

@@ -94,6 +94,13 @@
     <div class="onboard-f">저는<div class="seg" role="radiogroup" aria-label="신랑 또는 신부">
       <label><input type="radio" name="role" value="groom" required>신랑</label><label><input type="radio" name="role" value="bride">신부</label>
     </div></div>
+    <div class="onboard-f">결혼 예정일 (선택)
+      <button type="button" class="in date-btn empty" id="wd-btn" aria-expanded="false" aria-controls="wd-cal">날짜 선택</button>
+      <div class="cal" id="wd-cal" hidden></div>
+      <div class="seg tri" id="wd-range" role="radiogroup" aria-label="날짜 정확도" hidden>
+        <label><input type="radio" name="wdRange" value="0" checked>정확해요</label><label><input type="radio" name="wdRange" value="1">±1개월</label><label><input type="radio" name="wdRange" value="3">±3개월</label>
+      </div>
+    </div>
     <p class="note err" id="profile-err" role="alert" hidden></p>
     <button class="btn onboard-go">시작하기</button>
   </form>
@@ -116,6 +123,7 @@
 <script src="slides.js"></script>
 <script src="app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="datepick.js"></script>
 <script src="account.js"></script>
 </body>
 </html>
