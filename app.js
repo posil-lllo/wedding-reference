@@ -596,6 +596,7 @@ function renderView(view) {
   document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.view === view)));
   if (view === 'view') deckEl.innerHTML = renderDeck(withoutBlanks(state));
   if (view === 'my') renderMyPage(); // account.js
+  if (view === 'edit') window.askLogin?.(); // account.js. 처음 열 때는 아직 안 불렸을 수 있고, 그때는 account.js 가 로그인 확인 뒤 부름
   scrollTo(0, 0);
 }
 addEventListener('popstate', () => {
