@@ -241,7 +241,7 @@ document.addEventListener('click', (e) => {
   const t = e.target;
   if (myMenu.contains(t) && t.closest('button')) myMenu.hidePopover();
   if (t.closest('[data-login]')) login();
-  else if (t.closest('[data-save-draft]')) saveDraft();
+  else if (t.closest('[data-save-draft]')) saveDraft(true);
   else if (t.closest('[data-new-draft]')) newDraft();
   else if (t.closest('[data-logout]')) logout();
 });
@@ -280,7 +280,8 @@ draftsEl.addEventListener('click', async (e) => {
   }
 });
 // 작업 중인 시안에 바로 저장 (버튼은 로그인 상태에서만 보임)
-async function saveDraft() {
+// notify: 버튼으로 저장했을 때만 결과를 팝업으로 알림 (로그아웃 전 저장은 조용히)
+async function saveDraft(notify = false) {
   try {
     clearTimeout(saveTimer);
     await idb('readwrite', (s) => s.put(state, 'current'));
@@ -289,10 +290,12 @@ async function saveDraft() {
     } else await syncDraft(state);
     setStatus('임시 저장됨 · 마이페이지에서 볼 수 있어요');
     track('save_draft');
+    if (notify) alert('임시 저장했어요.\n마이페이지에서 볼 수 있어요.');
     return true;
   } catch (e) {
     console.error('save draft failed', e);
     setStatus(`임시 저장 실패 (${e?.name || e})`, true);
+    if (notify) alert('임시 저장하지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.\n입력한 내용은 이 기기에는 남아 있어요.');
     return false;
   }
 }
