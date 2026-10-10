@@ -605,7 +605,7 @@ addEventListener('popstate', () => {
   renderView(v);
 });
 document.addEventListener('click', (e) => {
-  const b = e.target.closest('[data-view]');
+  const b = e.target.closest('button[data-view]'); // body 의 data-view(현재 화면 표시)는 버튼이 아님
   if (!b) return;
   show(b.dataset.view);
   if (b.dataset.view === 'my') track('open_mypage');
