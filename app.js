@@ -72,6 +72,7 @@ const wantToLikeDesc = (s) => (s.mu ? {
   ...s,
   mu: Object.fromEntries(Object.entries(s.mu).map(([side, { want, ...m }]) => [side, { ...m, likeDesc: m.likeDesc || want || '' }])),
 } : s);
+const restore = (saved) => withOneEach(splitShotHair(hairToImgs(merge(DEFAULT_STATE, wantToLikeDesc(saved)))));
 
 let state = withOneEach(DEFAULT_STATE);
 const get = (path) => getIn(state, path);
@@ -118,6 +119,7 @@ function scheduleSave() {
   saveTimer = setTimeout(async () => {
     try {
       await idb('readwrite', (s) => s.put(state, 'current'));
+      await syncDraft(state); // account.js
       setStatus('저장됨');
     } catch (e) {
       console.error('save failed', e);
@@ -484,7 +486,7 @@ function renderEditor() {
     ${muCard('bride', 'iii', '신부')}${muCard('groom', 'iv', '신랑')}
     ${hairCard('bride', 'v', '신부')}${hairCard('groom', 'vi', '신랑')}
     ${ITEM_LISTS.map(listCard).join('')}${shotCard()}
-    <div class="edit-bar"><button class="btn danger" data-reset>초기화</button><button class="btn" data-view="view">시안 완성하기</button></div>
+    <div class="edit-bar"><button class="btn danger" data-reset>초기화</button><button class="btn soft" data-save-draft>임시 저장하기</button><button class="btn" data-view="view">시안 완성하기</button></div>
   </div>`;
 }
 
@@ -574,17 +576,38 @@ pointHex.addEventListener('blur', () => {
 
 // ── 탭 · 결과 ──
 const deckEl = document.getElementById('deck');
+// 화면마다 주소(#/edit 등)를 달리 둬서 새로고침·뒤로 가기에도 그 화면이 유지됨
+const VIEWS = ['home', 'mbti', 'edit', 'view', 'my'];
+const viewFromHash = () => {
+  const v = location.hash.slice(2);
+  return VIEWS.includes(v) ? v : 'home';
+};
+const urlOf = (view) => (view === 'home' ? location.pathname + location.search : `#/${view}`);
 function show(view) {
-  document.getElementById('view-edit').hidden = view !== 'edit';
-  document.getElementById('view-view').hidden = view !== 'view';
+  if (viewFromHash() !== view) history.pushState(null, '', urlOf(view));
+  renderView(view);
+}
+function renderView(view) {
+  document.body.dataset.view = view;
+  VIEWS.forEach((v) => { document.getElementById(`view-${v}`).hidden = v !== view; });
   document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.view === view)));
   if (view === 'view') deckEl.innerHTML = renderDeck(withoutBlanks(state));
+  if (view === 'my') renderMyPage(); // account.js
   scrollTo(0, 0);
 }
+addEventListener('popstate', () => {
+  const v = viewFromHash();
+  if (v === 'my' && !user) { // 로그아웃 뒤 마이페이지로 돌아온 경우 (user 는 account.js)
+    history.replaceState(null, '', urlOf('home'));
+    return renderView('home');
+  }
+  renderView(v);
+});
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-view]');
   if (!b) return;
   show(b.dataset.view);
+  if (b.dataset.view === 'my') track('open_mypage');
   if (b.dataset.view === 'view') track('view_result', { from: b.closest('.edit-bar') ? 'complete_button' : 'tab' });
 });
 
@@ -650,17 +673,18 @@ document.getElementById('pdf').addEventListener('click', async (e) => {
   }
 });
 
-// ── 시작 ──
-(async () => {
+// ── 시작 ── (account.js 가 ready 를 기다렸다가 로그인 상태를 이어 붙임)
+const ready = (async () => {
   try {
     const saved = await idb('readonly', (s) => s.get('current'));
-    if (saved) state = withOneEach(splitShotHair(hairToImgs(merge(DEFAULT_STATE, wantToLikeDesc(saved)))));
+    if (saved) state = restore(saved);
   } catch (e) {
     console.error('load failed', e);
     setStatus('저장된 내용을 불러오지 못했어요', true);
   }
   applyPointColor(state.pointColor);
   renderEditor();
+  if (viewFromHash() !== 'my') renderView(viewFromHash()); // 마이페이지는 로그인 확인 뒤 account.js 가 띄움
 })();
 
 document.getElementById('fb-go').addEventListener('click', () => {

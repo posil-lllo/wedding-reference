@@ -16,9 +16,9 @@
   gtag('config', 'G-N1LGWGD5MF');
 </script>
 </head>
-<body>
+<body data-view="home">
 <div class="top"><div class="top-in">
-  <div class="brand">Our Wedding Shoot <small>촬영 시안 만들기</small></div>
+  <button class="brand" data-view="home" aria-label="홈으로">Posil</button>
   <span class="status" id="status" role="status"></span><button class="info" id="save-info" popovertarget="save-help" aria-label="임시 저장 실패 안내" hidden>i</button>
   <div class="help" id="save-help" popover>
     <b>임시 저장이 안 된 상태예요</b>
@@ -32,7 +32,7 @@
   </div>
   <div class="top-r">
     <div class="tabs" role="tablist">
-      <button class="tab" role="tab" aria-selected="true" data-view="edit">입력</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="edit">입력</button>
       <button class="tab" role="tab" aria-selected="false" data-view="view">결과 미리보기</button>
     </div>
     <button class="iconbtn" popovertarget="toc" aria-label="목차"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r=".8"/><circle cx="4.5" cy="12" r=".8"/><circle cx="4.5" cy="18" r=".8"/></svg></button>
@@ -42,19 +42,43 @@
       <p>문의나 피드백이 있다면, 구글폼에 남겨주세요.<br>확인하고 연락드리겠습니다!</p>
       <div class="crop-btns fb-btns"><button class="btn soft" popovertarget="fb" popovertargetaction="hide">취소</button><a class="btn" id="fb-go" href="https://forms.gle/s7zKCAUqwVrtCPg47" target="_blank" rel="noopener">문의 남기기</a></div>
     </div>
+    <button class="kakao" id="login-top" data-login><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="#000" d="M12 3C6.48 3 2 6.48 2 10.78c0 2.78 1.86 5.22 4.66 6.6l-.95 3.5c-.08.3.26.55.52.38l4.13-2.73c.54.07 1.08.1 1.64.1 5.52 0 10-3.48 10-7.85S17.52 3 12 3z"/></svg><span><span class="full">카카오 </span>로그인</span></button>
+    <button class="iconbtn" id="my-btn" popovertarget="my-menu" aria-label="마이페이지" title="마이페이지" hidden><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg></button>
+    <nav class="help my-menu" id="my-menu" popover aria-label="내 메뉴"><button data-view="my">마이페이지</button><button data-new-draft>새 시안 만들기</button><button data-logout>로그아웃</button></nav>
   </div>
 </div></div>
 
-<main class="wrap" id="view-edit">
+<main class="wrap home" id="view-home">
+  <button class="home-btn" data-view="mbti">결혼준비<br>성향 테스트</button>
+  <button class="home-btn" data-view="edit">웨딩촬영<br>시안 만들기</button>
+</main>
+
+<main class="mbti" id="view-mbti" hidden><iframe src="mbti/" title="결혼준비 성향 테스트" loading="lazy"></iframe></main>
+
+<main class="wrap" id="view-edit" hidden>
   <div class="editor" id="editor"></div>
 </main>
 
 <main class="wrap deck" id="view-view" hidden>
   <div class="deck-h">
+    <div class="login-cta" id="login-cta"><button class="kakao" data-login><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="#000" d="M12 3C6.48 3 2 6.48 2 10.78c0 2.78 1.86 5.22 4.66 6.6l-.95 3.5c-.08.3.26.55.52.38l4.13-2.73c.54.07 1.08.1 1.64.1 5.52 0 10-3.48 10-7.85S17.52 3 12 3z"/></svg>카카오 로그인</button><span>로그인하고 임시저장하기</span></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="bgpick">포인트 컬러 <input type="color" id="point-color"><input class="hex" id="point-hex" maxlength="7" spellcheck="false" aria-label="포인트 컬러 코드"></label><button class="btn pill" id="point-reset">색 초기화</button><button class="btn pill" data-view="edit">수정</button></div>
   </div>
   <div class="slides" id="deck"></div>
   <div class="pdf-bar"><button class="btn" id="pdf">PDF 내보내기</button></div>
+</main>
+
+<main class="wrap mypage" id="view-my" hidden>
+  <section class="profile">
+    <div class="avatar" id="my-avatar" aria-hidden="true"></div>
+    <div class="profile-info">
+      <h1 id="my-name"></h1>
+      <p class="note" id="my-count"></p>
+      <div class="profile-btns"><button class="btn" data-new-draft>+ 새 시안 만들기</button></div>
+    </div>
+  </section>
+  <h2 class="refs-h">레퍼런스 모음</h2>
+  <div class="refs" id="drafts"></div>
 </main>
 
 <dialog class="crop" id="crop" aria-labelledby="crop-h">
@@ -73,5 +97,7 @@
 <script src="collage.js"></script>
 <script src="slides.js"></script>
 <script src="app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="account.js"></script>
 </body>
 </html>
