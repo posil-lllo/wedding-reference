@@ -1,6 +1,6 @@
 // 결혼 예정일 달력. 날짜와 오차(미정 / 정확한 날짜 / ±1개월 / ±3개월)를 함께 고르고 완료를 눌러야 반영됨
-// 제목을 누르면 연도, 월 순서로 고를 수 있음. 오늘 이전은 고를 수 없음. 화면 전환은 onToggle(open) 을 받는 쪽이 함
-function datePicker(btn, panel, { onToggle = () => {} } = {}) {
+// 제목을 누르면 연도, 월 순서로 고를 수 있음. 오늘 이전은 고를 수 없음. 화면 전환은 onToggle(open), 완료 뒤 처리는 onDone(value) 을 받는 쪽이 함
+function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {}) {
   const WEEK = '일월화수목금토';
   const RANGES = [['', '미정'], ['0', '정확한 날짜'], ['1', '±1개월'], ['3', '±3개월']];
   const NONE = { date: '', range: null }; // range: 오차(개월), 0 은 정확한 날짜, 날짜가 없으면 null
@@ -92,7 +92,8 @@ function datePicker(btn, panel, { onToggle = () => {} } = {}) {
       value = draft.date ? draft : NONE;
       showValue();
       close();
-      return btn.focus();
+      btn.focus();
+      return onDone(value);
     }
     if (ds.step) {
       const n = Number(ds.step);

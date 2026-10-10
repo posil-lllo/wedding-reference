@@ -347,6 +347,9 @@ const wdPicker = datePicker(document.getElementById('wd-btn'), document.getEleme
     document.getElementById('profile-main').hidden = open;
     document.getElementById('wd-view').hidden = !open;
   },
+  onDone: () => { // 날짜만 고치는 창은 달력에서 바로 저장
+    if (profileDlg.dataset.mode === 'date') profileForm.requestSubmit();
+  },
 });
 
 const weddingText = () => {
@@ -381,6 +384,7 @@ function openProfile(mode) {
   setNickMsg('');
   profileErr.hidden = true;
   profileDlg.showModal();
+  if (mode === 'date') document.getElementById('wd-btn').click(); // 날짜만 고칠 때는 달력부터
 }
 profileDlg.addEventListener('cancel', (e) => { if (profileDlg.dataset.mode === 'onboard') e.preventDefault(); }); // 처음 받을 때는 Esc 로 닫히지 않게
 document.querySelectorAll('#profile-x, #wd-x').forEach((b) => b.addEventListener('click', () => profileDlg.close()));
