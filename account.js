@@ -386,7 +386,7 @@ function openProfile(mode) {
   profileDlg.showModal();
 }
 profileDlg.addEventListener('cancel', (e) => { if (profileDlg.dataset.mode === 'onboard') e.preventDefault(); }); // 처음 받을 때는 Esc 로 닫히지 않게
-document.getElementById('profile-cancel').addEventListener('click', () => profileDlg.close());
+document.getElementById('profile-x').addEventListener('click', () => profileDlg.close());
 profileForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const nickname = profileForm.nickname.value.trim();

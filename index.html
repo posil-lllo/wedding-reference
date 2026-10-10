@@ -94,7 +94,7 @@
 <dialog class="crop onboard" id="profile" aria-labelledby="profile-h">
   <form id="profile-form">
     <div id="profile-main">
-    <p class="crop-h" id="profile-h">반가워요! 처음 한 번만 알려 주세요</p>
+    <div class="crop-top"><p class="crop-h" id="profile-h">반가워요! 처음 한 번만 알려 주세요</p><button type="button" class="crop-x" id="profile-x" aria-label="닫기">✕</button></div>
     <label class="onboard-f" data-for="profile">닉네임<input class="in" name="nickname" maxlength="20" autocomplete="nickname" aria-describedby="nick-msg"><span class="onboard-msg" id="nick-msg" aria-live="polite" hidden></span></label>
     <div class="onboard-f" data-for="profile">저는<div class="pills" role="radiogroup" aria-label="신랑 또는 신부">
       <label><input type="radio" name="role" value="groom" required>신랑</label><label><input type="radio" name="role" value="bride">신부</label>
@@ -106,7 +106,7 @@
       </div>
     </div>
     <p class="note err" id="profile-err" role="alert" hidden></p>
-    <div class="onboard-btns"><button type="button" class="btn soft" id="profile-cancel">취소</button><button class="btn onboard-go">시작하기</button></div>
+    <button class="btn onboard-go">시작하기</button>
     </div>
     <div id="wd-view" hidden>
       <p class="crop-h">결혼 예정일</p>
