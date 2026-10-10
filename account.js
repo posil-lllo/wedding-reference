@@ -314,17 +314,9 @@ async function newDraft() {
 }
 async function logout() {
   if (!confirm('로그아웃할까요?')) return;
-  // 편집 화면이면 임시 저장 버튼을 누른 것처럼 저장부터 (빈 화면은 새 시안을 만들지 않음)
-  if (document.body.dataset.view === 'edit' && (draftId || hasContent(state))) {
+  // 작업 중인 시안이 있으면 그 시안에 저장부터. 로그아웃하면서 새 시안을 만들지는 않음 (시안이 꽉 찼으면 용량 안내가 뜨므로)
+  if (draftId && (document.body.dataset.view === 'edit' || saveTimer)) {
     if (!(await saveDraft()) && !confirm('저장하지 못했어요. 입력한 내용은 이 기기에 남아요. 그래도 로그아웃할까요?')) return;
-  } else if (saveTimer) {
-    // 다른 화면이어도 아직 서버에 안 올라간 수정이 있으면 로그인 상태일 때 먼저 올린다
-    clearTimeout(saveTimer);
-    saveTimer = null;
-    try {
-      await idb('readwrite', (s) => s.put(state, 'current'));
-      await syncDraft(state);
-    } catch (e) { console.error('save before logout failed', e); }
   }
   try {
     await backend.logout();
