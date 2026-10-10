@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>웨딩 성향 테스트</title>
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://posil-lllo.github.io/wedding-reference/mbti/">
+  <meta property="og:title" content="나는 어떤 예비부부일까?">
+  <meta property="og:description" content="19개 질문으로 알아보는 나의 결혼 준비 캐릭터">
+  <meta property="og:image" content="https://posil-lllo.github.io/wedding-reference/mbti/%EC%84%9C%EC%9E%88%EB%8A%94%EB%AA%A8%EC%8A%B5/%EC%A4%80%EB%B9%84%20%EA%B8%B0%EB%A1%9D%EA%B0%80%ED%98%95-%EC%97%AC%EC%9E%90.png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app">
+    <section id="start" class="screen">
+      <p class="eyebrow">결혼 준비 성향 테스트</p>
+      <h1>나는 어떤 예비부부일까?</h1>
+      <p class="lead">19개 질문으로 알아보는 나의 결혼 준비 캐릭터</p>
+      <p class="label">나는</p>
+      <div class="choices">
+        <button class="choice" data-gender="여자">신부</button>
+        <button class="choice" data-gender="남자">신랑</button>
+      </div>
+    </section>
+
+    <section id="quiz" class="screen" hidden>
+      <div class="progress"><div id="bar"></div></div>
+      <p id="count" class="eyebrow"></p>
+      <h2 id="question"></h2>
+      <div id="options" class="choices"></div>
+      <div class="nav">
+        <button id="back" class="ghost">이전 질문</button>
+        <button id="next" class="ghost">다음 질문</button>
+      </div>
+    </section>
+
+    <section id="result" class="screen" hidden>
+      <p class="eyebrow">나의 결혼 준비 캐릭터는</p>
+      <div class="frame">
+        <img id="char-img" alt="">
+        <button id="story" class="story" aria-label="인스타그램 스토리에 올리기" title="인스타그램 스토리에 올리기" hidden>
+          <img src="instagram.jpg" alt="">
+        </button>
+      </div>
+      <h1 id="char-name"></h1>
+      <p id="char-sub" class="sub"></p>
+      <p id="char-line" class="lead"></p>
+      <div class="card">
+        <h3>어떤 사람일까?</h3>
+        <p id="char-intro" class="intro"></p>
+        <p id="char-desc" class="desc"></p>
+      </div>
+      <div class="card">
+        <h3>결혼 준비에서 중요하게 여기는 것</h3>
+        <div id="value-bars" class="bars"></div>
+        <h3 class="gap">정하는 방식</h3>
+        <div id="style-bars" class="bars"></div>
+      </div>
+      <details class="card answers">
+        <summary>내가 고른 답변 보기</summary>
+        <ol id="answer-list"></ol>
+      </details>
+      <button id="share" class="choice kakao">카카오톡으로 공유하기</button>
+      <div class="actions">
+        <a class="choice" href="characters.html">다른 캐릭터 보러가기</a>
+        <button id="restart" class="choice">다시 하기</button>
+      </div>
+    </section>
+  </main>
+  <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.6/kakao.min.js" integrity="sha384-WAtVcQYcmTO/N+C1N+1m6Gp8qxh+3NlnP7X1U7qP6P5dQY/MsRBNTh+e1ahJrkEm" crossorigin="anonymous"></script>
+  <script src="data.js"></script>
+  <script src="logic.js"></script>
+  <script src="story.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

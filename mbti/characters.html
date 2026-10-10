@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>캐릭터 모아 보기</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    #app { max-width: 720px; padding-bottom: 120px; }
+    .cta { position: fixed; left: 0; right: 0; bottom: 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, var(--bg) 40%); }
+    .cta .choice { max-width: 480px; margin: 0 auto; text-align: center; }
+    .pair { margin-bottom: 32px; }
+    .pair h2 { min-height: 0; margin: 0 0 12px; }
+    .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .cell { padding: 0; border: 0; background: none; font: inherit; color: var(--muted); font-size: 14px; cursor: pointer; }
+    .cell .frame { margin: 0 0 6px; max-width: none; transition: transform 0.15s; }
+    .cell:hover .frame, .cell:focus-visible .frame { transform: translateY(-3px); }
+
+    dialog { width: calc(100% - 32px); max-width: 440px; max-height: 90vh; padding: 0; border: 0; border-radius: 24px; background: var(--bg); color: var(--ink); text-align: center; }
+    .sheet { padding: 24px 20px 20px; }
+    dialog .card { margin-bottom: 0; }
+    dialog::backdrop { background: rgba(74, 58, 58, 0.45); }
+    dialog .frame { max-width: 260px; }
+    dialog h1 { margin-bottom: 8px; }
+    .close { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--card); color: var(--muted); font-size: 20px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <main id="app" class="screen">
+    <h1>결혼 준비 캐릭터</h1>
+    <div id="list"></div>
+  </main>
+
+  <div class="cta"><a class="choice" href="./">나도 테스트하기</a></div>
+
+  <dialog id="detail">
+    <div class="sheet">
+    <button class="close" aria-label="닫기">×</button>
+    <div class="frame"><img id="d-img" alt=""></div>
+    <h1 id="d-name"></h1>
+    <p id="d-line" class="lead"></p>
+    <div class="card">
+      <h3>어떤 사람일까?</h3>
+      <p id="d-intro" class="intro"></p>
+      <p id="d-desc" class="desc"></p>
+    </div>
+    </div>
+  </dialog>
+
+  <script src="data.js"></script>
+  <script>
+    const GENDERS = [["여자", "신부"], ["남자", "신랑"]];
+    const $ = (id) => document.getElementById(id);
+    const detail = $("detail");
+
+    function openDetail(key, gender) {
+      const c = CHARACTERS[key];
+      $("d-img").src = encodeURI(`서있는모습/${c.image}-${gender}.png`);
+      $("d-img").alt = c.name;
+      $("d-name").textContent = c.name;
+      $("d-line").textContent = c.line;
+      $("d-intro").textContent = c.intro;
+      $("d-desc").textContent = c.desc;
+      detail.showModal();
+      detail.scrollTop = 0;
+    }
+
+    $("list").replaceChildren(...Object.entries(CHARACTERS).map(([key, c]) => {
+      const pair = document.createElement("section");
+      pair.className = "pair";
+      const name = document.createElement("h2");
+      name.textContent = c.name;
+      const cols = document.createElement("div");
+      cols.className = "cols";
+      cols.append(...GENDERS.map(([gender, label]) => {
+        const cell = document.createElement("button");
+        cell.className = "cell";
+        cell.onclick = () => openDetail(key, gender);
+        const frame = document.createElement("div");
+        frame.className = "frame";
+        const img = document.createElement("img");
+        img.src = encodeURI(`서있는모습/${c.image}-${gender}.png`);
+        img.alt = `${c.name} ${label}`;
+        frame.append(img);
+        cell.append(frame, label);
+        return cell;
+      }));
+      pair.append(name, cols);
+      return pair;
+    }));
+
+    detail.querySelector(".close").onclick = () => detail.close();
+    detail.onclick = (e) => { if (e.target === detail) detail.close(); };
+    // 공유 링크(?c=캐릭터&g=성별)로 열면 그 캐릭터 설명을 바로 띄우고, 닫으면 주소에서 지운다.
+    detail.onclose = () => { if (location.search) history.replaceState(null, "", location.pathname); };
+
+    const params = new URLSearchParams(location.search);
+    const sharedKey = params.get("c");
+    if (Object.hasOwn(CHARACTERS, sharedKey ?? "")) {
+      const gender = GENDERS.some(([g]) => g === params.get("g")) ? params.get("g") : "여자";
+      openDetail(sharedKey, gender);
+    }
+  </script>
+</body>
+</html>
