@@ -12,6 +12,13 @@
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
+  // 주소 끝에 ?notrack 을 붙여 한 번 들어온 브라우저는 통계에서 빠짐 (?track 으로 되돌림)
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.has('notrack')) localStorage.setItem('wr-notrack', '1');
+    if (q.has('track')) localStorage.removeItem('wr-notrack');
+    window['ga-disable-G-N1LGWGD5MF'] = localStorage.getItem('wr-notrack') === '1';
+  } catch (e) {}
   gtag('js', new Date());
   gtag('config', 'G-N1LGWGD5MF');
 </script>
