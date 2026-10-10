@@ -118,7 +118,7 @@ textarea.in { min-height: 64px; resize: vertical; }
 .onboard-f { display: grid; gap: 6px; margin-top: 14px; font-size: 13px; color: var(--muted); }
 .onboard .seg label:has(input:checked) { background: #e3edf9; color: var(--accent-text); }
 .pills { display: flex; gap: 8px; }
-.pills label { padding: 6px 18px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); cursor: pointer; }
+.pills label { flex: 1; text-align: center; padding: 6px 18px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); cursor: pointer; }
 .pills input { position: absolute; opacity: 0; pointer-events: none; }
 .pills label:has(input:checked) { background: #e3edf9; border-color: #c3d6ee; color: var(--accent-text); }
 .pills label:has(input:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: 2px; }
