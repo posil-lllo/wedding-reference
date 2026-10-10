@@ -95,6 +95,7 @@ const backend = {
 };
 
 let user = null;
+let profile = null; // profiles 테이블의 내 행 { nickname, role, character }
 let draftId = null;
 // syncedAt: 이 브라우저가 마지막으로 불러오거나 저장한 서버 시각. 서버 값과 다르면 다른 창·기기가 그 뒤에 저장한 것
 let syncedAt = 0;
@@ -193,7 +194,7 @@ async function renderMyPage() {
   const list = await backend.list();
   const covers = await backend.signedUrls([...new Set(list.map((d) => photoPaths(d.data)[0]).filter(Boolean))]);
   document.getElementById('my-avatar').innerHTML = user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : DEFAULT_AVATAR;
-  document.getElementById('my-name').textContent = user.name;
+  document.getElementById('my-name').textContent = profile?.nickname || user.name;
   document.getElementById('my-count').textContent = `촬영 시안 ${list.length}개`;
   draftsEl.innerHTML = list.map((d) => draftCard(d, covers[photoPaths(d.data)[0]])).join('') || '<p class="note">저장된 시안이 없어요</p>';
 }
@@ -330,11 +331,47 @@ async function logout() {
     console.error('logout failed', e); // 서버 세션이 남아도 이 기기에서는 로그아웃 처리
   }
   user = null;
+  profile = null;
   setDraftId(null);
   renderAuth();
   setStatus('');
   show('edit');
 }
+
+// ── 프로필: 처음 로그인한 사용자에게 닉네임과 신랑·신부를 받음 ──
+const profileDlg = document.getElementById('profile');
+const profileForm = document.getElementById('profile-form');
+const profileErr = document.getElementById('profile-err');
+
+const showNickname = () => { document.getElementById('my-name').textContent = profile.nickname; };
+async function ensureProfile() {
+  profile = must(await sb.from('profiles').select('nickname,role,character').maybeSingle());
+  if (profile) return showNickname();
+  profileForm.nickname.value = user.name === '이름 없음' ? '' : user.name; // 카카오 닉네임을 기본값으로
+  profileDlg.showModal();
+}
+profileDlg.addEventListener('cancel', (e) => e.preventDefault()); // Esc 로 닫히지 않게
+profileForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const nickname = profileForm.nickname.value.trim();
+  const role = profileForm.role.value;
+  if (!nickname) return profileForm.nickname.focus();
+  const btn = profileForm.querySelector('button');
+  btn.disabled = true;
+  profileErr.hidden = true;
+  try {
+    profile = must(await sb.from('profiles').insert({ nickname, role }).select('nickname,role,character').single());
+    profileDlg.close();
+    showNickname();
+    track('profile_done', { role });
+  } catch (err) {
+    console.error('profile save failed', err);
+    profileErr.textContent = '저장하지 못했어요. 잠시 뒤 다시 눌러 주세요.';
+    profileErr.hidden = false;
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 // 저장된 입력(app.js ready)을 먼저 불러온 뒤 로그인 상태를 이어 붙임
 (async () => {
@@ -361,5 +398,7 @@ async function logout() {
     console.error('auth init failed', e);
     setStatus('로그인 상태를 확인하지 못했어요', true);
   }
+  // 프로필이 없으면(처음 로그인) 닉네임·신랑신부 입력 창. 실패해도 다른 기능은 그대로 씀
+  if (user) ensureProfile().catch((e) => console.error('profile load failed', e));
 })();
 renderAuth();

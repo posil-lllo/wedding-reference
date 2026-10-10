@@ -88,6 +88,18 @@
   <div class="refs" id="drafts"></div>
 </main>
 
+<dialog class="crop onboard" id="profile" aria-labelledby="profile-h">
+  <form id="profile-form">
+    <p class="crop-h" id="profile-h">반가워요! 처음 한 번만 알려 주세요</p>
+    <label class="onboard-f">닉네임<input class="in" name="nickname" maxlength="20" required autocomplete="nickname"></label>
+    <div class="onboard-f">저는<div class="seg" role="radiogroup" aria-label="신랑 또는 신부">
+      <label><input type="radio" name="role" value="groom" required>신랑</label><label><input type="radio" name="role" value="bride">신부</label>
+    </div></div>
+    <p class="note err" id="profile-err" role="alert" hidden></p>
+    <button class="btn onboard-go">시작하기</button>
+  </form>
+</dialog>
+
 <dialog class="crop" id="crop" aria-labelledby="crop-h">
   <form method="dialog">
     <div class="crop-top"><p class="crop-h" id="crop-h">사진 크기 조절</p><button type="button" class="crop-x" id="crop-x" aria-label="닫기">✕</button></div>

@@ -36,3 +36,17 @@ create policy "own photos insert" on storage.objects for insert to authenticated
   with check (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "own photos delete" on storage.objects for delete to authenticated
   using (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- 사용자 프로필: 처음 로그인할 때 닉네임과 신랑·신부를 받음. character 는 성향 테스트 결과(나중에 채움)
+create table public.profiles (
+  user_id uuid primary key default auth.uid() references auth.users on delete cascade,
+  nickname text not null check (char_length(nickname) between 1 and 20),
+  role text not null check (role in ('groom', 'bride')),
+  character text,
+  created_at timestamptz not null default now()
+);
+alter table public.profiles enable row level security;
+create policy "own profile" on public.profiles for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+revoke all on public.profiles from anon;
+grant select, insert, update on public.profiles to authenticated;
