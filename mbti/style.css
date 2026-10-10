@@ -125,4 +125,15 @@ a.choice { display: block; text-decoration: none; }
 .answers .q { color: var(--muted); font-size: 14px; }
 .answers .a { font-weight: 600; }
 
-.home-link { display: block; width: fit-content; margin: -24px 0 16px; font: 26px "Pinyon Script", cursive; color: #6d93bd; text-decoration: none; line-height: 1; }
+/* 상단 바: 홈(../style.css .top)과 같은 모양 */
+.top { position: sticky; top: 0; z-index: 5; background: #fffefa; border-bottom: 1px solid #eae7dc; }
+.top-in { max-width: 1120px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; }
+.brand { font: 28px "Pinyon Script", cursive; color: #6d93bd; text-decoration: none; line-height: 1; }
+.top .iconbtn { display: grid; place-items: center; width: 36px; height: 36px; margin-left: auto; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #8a8d93; cursor: pointer; }
+.top .iconbtn:hover { background: rgb(0 0 0 / .06); }
+.fb { max-width: min(360px, calc(100vw - 32px)); padding: 16px 18px; border: 1px solid #eae7dc; border-radius: 10px; background: #fffefa; color: #3a3d44; font-size: 13px; line-height: 1.6; box-shadow: 0 8px 24px rgb(0 0 0 / .12); }
+.fb::backdrop { background: rgb(0 0 0 / .15); }
+.fb p { margin: 0; }
+.fb-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.fb-btns > * { padding: 5px 14px; border: 1px solid #6a9edb; border-radius: 6px; background: #6a9edb; color: #fff; font: inherit; text-decoration: none; cursor: pointer; }
+.fb-btns .soft { border-color: #f1f0ec; background: #f1f0ec; color: #3a3d44; }

@@ -6,6 +6,8 @@
 const sb = supabase.createClient('https://yucqtbuefqjdoszhavzb.supabase.co', 'sb_publishable_BUsTCR2Q9rQx6W8D4otopg_s4ooALX-');
 const BUCKET = 'photos';
 const LOGIN_FLAG = 'wr-login';
+const ASKED_FLAG = 'wr-login-asked';
+const SKIP_DAY = 'wr-login-ask-skip'; // '오늘 하루 보지 않기' 누른 날짜
 const MAX_DRAFTS = 2; // 서버 용량 때문에 계정당 시안 수 제한
 const must = ({ data, error }) => {
   if (error) throw error;
@@ -198,6 +200,15 @@ async function renderMyPage() {
   draftsEl.innerHTML = list.map((d) => draftCard(d, covers[photoPaths(d.data)[0]])).join('') || '<p class="note">저장된 시안이 없어요</p>';
 }
 
+// 비로그인으로 시안 화면에 처음 들어오면 탭마다 한 번 로그인 권유. 로그인 상태를 확인하기 전이면 확인한 뒤에 띄움
+let authChecked = false;
+function askLogin() {
+  if (!authChecked || user || sessionStorage.getItem(ASKED_FLAG)) return;
+  if (localStorage.getItem(SKIP_DAY) === new Date().toDateString()) return;
+  sessionStorage.setItem(ASKED_FLAG, '1');
+  document.getElementById('login-ask').showPopover();
+}
+
 // 카카오에서 돌아온 직후 한 번: 비로그인으로 작업하던 내용이 있으면 새 시안으로 저장, 없으면 마지막 시안을 이어서
 // 시안이 이미 꽉 찼으면 작업 내용은 이 기기에만 두고 안내 팝업 없이 넘어감 (덮어쓰지 않음)
 async function afterLogin() {
@@ -244,6 +255,7 @@ document.addEventListener('click', (e) => {
   else if (t.closest('[data-new-draft]')) newDraft();
   else if (t.closest('[data-logout]')) logout();
   else if (t.closest('[data-edit]')) openProfile(t.closest('[data-edit]').dataset.edit);
+  else if (t.closest('[data-skip-ask]')) localStorage.setItem(SKIP_DAY, new Date().toDateString()); // 닫기는 popovertarget 이 함
   // 메뉴를 닫은 뒤 상담원 아이콘과 같은 문의 창을 띄움
   else if (t.closest('[data-fb]')) document.getElementById('fb').showPopover();
 });
@@ -328,6 +340,7 @@ async function logout() {
   setDraftId(null);
   renderAuth();
   setStatus('');
+  sessionStorage.setItem(ASKED_FLAG, '1'); // 방금 로그아웃한 사람에게는 다시 권하지 않음
   show('edit');
 }
 
@@ -450,5 +463,7 @@ profileForm.addEventListener('submit', async (e) => {
   }
   // 로그인 직후에만, 닉네임·신랑신부가 비어 있으면 입력 창. 실패해도 다른 기능은 그대로 씀
   if (user) ensureProfile(justLoggedIn).catch((e) => console.error('profile load failed', e));
+  authChecked = true;
+  if (viewFromHash() === 'edit') askLogin();
 })();
 renderAuth();

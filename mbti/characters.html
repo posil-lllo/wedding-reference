@@ -37,8 +37,16 @@
   </style>
 </head>
 <body>
+  <!-- 홈(../index.html)과 같은 상단 바. 로그인·마이페이지는 홈에만 있음 -->
+  <header class="top"><div class="top-in">
+    <a class="brand" href="../" aria-label="Posil 홈으로">Posil</a>
+    <button class="iconbtn" popovertarget="fb" aria-label="문의·피드백" title="문의·피드백"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 14v-2a7.5 7.5 0 0 1 15 0v2"/><rect x="3.5" y="13" width="4" height="5.5" rx="1.6"/><rect x="16.5" y="13" width="4" height="5.5" rx="1.6"/><path d="M18.5 18.5v.5a2.5 2.5 0 0 1-2.5 2.5h-2.5"/></svg></button>
+    <div class="fb" id="fb" popover role="dialog" aria-label="문의·피드백">
+      <p>문의나 피드백이 있다면, 구글폼에 남겨주세요.<br>확인하고 연락드리겠습니다!</p>
+      <div class="fb-btns"><button class="soft" popovertarget="fb" popovertargetaction="hide">취소</button><a href="https://forms.gle/s7zKCAUqwVrtCPg47" target="_blank" rel="noopener">문의 남기기</a></div>
+    </div>
+  </div></header>
   <main id="app" class="screen">
-    <a class="home-link" href="../" aria-label="Posil 홈으로">Posil</a>
     <h1>결혼 준비 캐릭터</h1>
     <div id="list"></div>
   </main>
@@ -91,7 +99,7 @@
         const frame = document.createElement("div");
         frame.className = "frame";
         const img = document.createElement("img");
-        img.src = encodeURI(`서있는모습/${c.image}-${gender}.png`);
+        img.src = encodeURI(`썸네일/${c.image}-${gender}.webp`); // 리스트는 작은 그림, 상세 팝업은 원본
         img.alt = `${c.name} ${label}`;
         frame.append(img);
         cell.append(frame, label);
