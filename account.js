@@ -257,13 +257,15 @@ async function saveDraft() {
     clearTimeout(saveTimer);
     await idb('readwrite', (s) => s.put(state, 'current'));
     if (!draftId) {
-      if (!(await createDraft(state))) return setStatus('');
+      if (!(await createDraft(state))) { setStatus(''); return false; }
     } else await syncDraft(state);
     setStatus('임시 저장됨 · 마이페이지에서 볼 수 있어요');
     track('save_draft');
+    return true;
   } catch (e) {
     console.error('save draft failed', e);
     setStatus(`임시 저장 실패 (${e?.name || e})`, true);
+    return false;
   }
 }
 async function newDraft() {
@@ -279,8 +281,11 @@ async function newDraft() {
 }
 async function logout() {
   if (!confirm('로그아웃할까요?')) return;
-  // 아직 서버에 안 올라간 수정이 있으면 로그인 상태일 때 먼저 올린다
-  if (saveTimer) {
+  // 편집 화면이면 임시 저장 버튼을 누른 것처럼 저장부터 (빈 화면은 새 시안을 만들지 않음)
+  if (document.body.dataset.view === 'edit' && (draftId || hasContent(state))) {
+    if (!(await saveDraft()) && !confirm('저장하지 못했어요. 입력한 내용은 이 기기에 남아요. 그래도 로그아웃할까요?')) return;
+  } else if (saveTimer) {
+    // 다른 화면이어도 아직 서버에 안 올라간 수정이 있으면 로그인 상태일 때 먼저 올린다
     clearTimeout(saveTimer);
     saveTimer = null;
     try {
