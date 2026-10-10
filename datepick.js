@@ -45,11 +45,12 @@ function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {})
       let cells = WEEK.split('').map((w) => `<i>${w}</i>`).join('') + '<span></span>'.repeat(new Date(y, m, 1).getDay());
       for (let d = 1, last = new Date(y, m + 1, 0).getDate(); d <= last; d++) {
         const v = isoOf(y, m, d);
-        const cls = [v === today && 'today', from && v >= from && v <= to && 'in-range'].filter(Boolean).join(' ');
+        const cls = [v === today && 'today', from && v >= from && v <= to && 'in-range',
+          v === from && 'range-start', v === to && 'range-end'].filter(Boolean).join(' ');
         cells += cell(`data-d="${v}"`, d, { off: v < today, on: v === date, cls });
       }
       const title = `<button type="button" class="cal-t" data-mode="year">${y}년 ${m + 1}월</button>`;
-      return head(title, 1, '달', y * 12 + m <= thisYear * 12 + thisMonth) + `<div class="cal-g">${cells}</div>`;
+      return head(title, 1, '달', y * 12 + m <= thisYear * 12 + thisMonth) + `<div class="cal-g days">${cells}</div>`;
     },
     year: ({ y }) => {
       const start = thisYear + Math.floor((y - thisYear) / 12) * 12;

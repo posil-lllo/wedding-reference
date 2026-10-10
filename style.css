@@ -134,17 +134,26 @@ textarea.in { min-height: 64px; resize: vertical; }
 .cal-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
 .cal-h > button:not(.cal-t) { width: 32px; height: 32px; font-size: 18px; line-height: 1; color: var(--muted); }
 .cal-t { padding: 6px 10px; font-weight: 500; }
-.cal-g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+.cal-g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px 0; text-align: center; }
 .cal-g.wide { grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .cal-g i { font-style: normal; font-size: 11px; color: var(--muted); padding: 2px 0; }
 .cal-g button { aspect-ratio: 1; font-size: 13px; }
 .cal-g.wide button { aspect-ratio: auto; height: 44px; }
-.cal :is(.cal-h, .cal-g) button:hover:not(:disabled) { background: var(--ivory); }
+.cal :is(.cal-h, .cal-g.wide) button:hover:not(:disabled) { background: var(--ivory); }
 .cal button:disabled { color: #cfcfcf; cursor: default; }
 .cal-g .today { color: var(--accent-text); }
-.cal-g button[aria-pressed="true"] { background: #e3edf9; color: var(--accent-text); }
+.cal-g.wide button[aria-pressed="true"] { background: #e3edf9; color: var(--accent-text); }
 .cal button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: -2px; }
-.cal-g .in-range { background: #f1f6fc; color: var(--accent-text); }
+/* 날짜 칸: 동그라미는 ::before, 오차 범위는 칸 배경 띠로 그림 */
+.cal-g.days button { position: relative; isolation: isolate; border-radius: 0; }
+.cal-g.days button::before { content: ''; position: absolute; inset: 3px; border-radius: 50%; z-index: -1; }
+.cal-g.days button:hover:not(:disabled, [aria-pressed="true"], .range-start, .range-end)::before { background: var(--ivory); }
+.cal-g.days .in-range { background: #f1f6fc; color: var(--accent-text); }
+.cal-g.days .range-start { background: linear-gradient(90deg, transparent 50%, #f1f6fc 50%); }
+.cal-g.days .range-end { background: linear-gradient(90deg, #f1f6fc 50%, transparent 50%); }
+.cal-g.days :is(.range-start, .range-end)::before { background: #d6e5f6; }
+.cal-g.days button[aria-pressed="true"] { color: #fff; }
+.cal-g.days button[aria-pressed="true"]::before { background: var(--accent); }
 .cal-r { margin-top: 14px; gap: 6px; }
 .cal .cal-r button { flex: auto; padding: 6px 10px; font-size: 12px; white-space: nowrap; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); }
 .cal .cal-r button[aria-pressed="true"] { background: #e3edf9; border-color: #c3d6ee; color: var(--accent-text); }
