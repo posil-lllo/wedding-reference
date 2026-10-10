@@ -151,7 +151,11 @@ function loadIntoEditor(data, view = 'edit') {
   applyPointColor(state.pointColor);
   renderEditor();
   if (view) show(view);
-  scheduleSave();
+  // 불러오기만 한 것은 이 기기에만 저장 (서버에 다시 올리면 다른 창에서 '수정됨'으로 보임)
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  setStatus('');
+  idb('readwrite', (s) => s.put(state, 'current')).catch((e) => console.error('local save failed', e));
 }
 
 // ── 화면 ──
