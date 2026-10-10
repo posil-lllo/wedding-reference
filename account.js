@@ -344,7 +344,13 @@ const setNickMsg = (text) => {
 };
 profileForm.nickname.addEventListener('input', () => setNickMsg(''));
 const wdRange = document.getElementById('wd-range');
-const wdPicker = datePicker(document.getElementById('wd-btn'), document.getElementById('wd-cal'), (v) => { wdRange.hidden = !v; });
+const wdPicker = datePicker(document.getElementById('wd-btn'), document.getElementById('wd-cal'), {
+  onChange: (v) => { wdRange.hidden = !v; },
+  onToggle: (open) => { // 달력은 프로필 입력 대신 같은 창에 보임
+    document.getElementById('profile-main').hidden = open;
+    document.getElementById('wd-view').hidden = !open;
+  },
+});
 
 const showNickname = () => { document.getElementById('my-name').textContent = profile.nickname; };
 async function ensureProfile(ask) {

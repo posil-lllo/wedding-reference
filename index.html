@@ -89,6 +89,7 @@
 
 <dialog class="crop onboard" id="profile" aria-labelledby="profile-h">
   <form id="profile-form">
+    <div id="profile-main">
     <p class="crop-h" id="profile-h">반가워요! 처음 한 번만 알려 주세요</p>
     <label class="onboard-f">닉네임<input class="in" name="nickname" maxlength="20" autocomplete="nickname" aria-describedby="nick-msg"><span class="onboard-msg" id="nick-msg" aria-live="polite" hidden></span></label>
     <div class="onboard-f">저는<div class="seg" role="radiogroup" aria-label="신랑 또는 신부">
@@ -96,13 +97,17 @@
     </div></div>
     <div class="onboard-f">결혼 예정일 (선택)
       <button type="button" class="in date-btn empty" id="wd-btn" aria-expanded="false" aria-controls="wd-cal">날짜 선택</button>
-      <div class="cal" id="wd-cal" hidden></div>
       <div class="seg tri" id="wd-range" role="radiogroup" aria-label="날짜 정확도" hidden>
         <label><input type="radio" name="wdRange" value="0" checked>정확해요</label><label><input type="radio" name="wdRange" value="1">±1개월</label><label><input type="radio" name="wdRange" value="3">±3개월</label>
       </div>
     </div>
     <p class="note err" id="profile-err" role="alert" hidden></p>
     <button class="btn onboard-go">시작하기</button>
+    </div>
+    <div id="wd-view" hidden>
+      <p class="crop-h">결혼 예정일</p>
+      <div class="cal" id="wd-cal"></div>
+    </div>
   </form>
 </dialog>
 

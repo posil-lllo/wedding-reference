@@ -123,20 +123,23 @@ textarea.in { min-height: 64px; resize: vertical; }
 .onboard .seg.tri { grid-template-columns: repeat(3, 1fr); }
 .date-btn { text-align: left; cursor: pointer; }
 .date-btn.empty { color: var(--muted); }
-.cal { padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+.cal { margin-top: 12px; color: var(--ink); }
 .cal button { border: 0; background: none; cursor: pointer; border-radius: 6px; }
-.cal-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 14px; }
-.cal-h b { font-weight: 500; }
-.cal-h button { width: 28px; height: 28px; font-size: 18px; line-height: 1; color: var(--muted); }
+.cal-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+.cal-h > button:not(.cal-t) { width: 32px; height: 32px; font-size: 18px; line-height: 1; color: var(--muted); }
+.cal-t { padding: 6px 10px; font-weight: 500; }
 .cal-g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+.cal-g.wide { grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .cal-g i { font-style: normal; font-size: 11px; color: var(--muted); padding: 2px 0; }
 .cal-g button { aspect-ratio: 1; font-size: 13px; }
-.cal-h button:hover, .cal-g button:hover:not(:disabled), .cal-clear:hover { background: var(--ivory); }
-.cal-g button:disabled { color: #cfcfcf; cursor: default; }
+.cal-g.wide button { aspect-ratio: auto; height: 44px; }
+.cal button:hover:not(:disabled) { background: var(--ivory); }
+.cal button:disabled { color: #cfcfcf; cursor: default; }
 .cal-g .today { color: var(--accent-text); }
 .cal-g button[aria-pressed="true"] { background: #e3edf9; color: var(--accent-text); }
 .cal button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: -2px; }
-.cal-clear { display: block; margin: 6px 0 0 auto; padding: 4px 8px; font-size: 12px; color: var(--muted); }
+.cal-f { display: flex; justify-content: space-between; margin-top: 12px; }
+.cal-f button { padding: 6px 10px; font-size: 13px; color: var(--muted); }
 .crop-stage { position: relative; margin: 0 auto 14px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
 #crop-cv { display: block; width: 100%; height: 100%; }
 /* 3:4 박스: 바깥은 어둡게, 안은 3분할 격자 */
