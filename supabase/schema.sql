@@ -50,3 +50,5 @@ create policy "own profile" on public.profiles for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 revoke all on public.profiles from anon;
 grant select, insert, update on public.profiles to authenticated;
+-- 닉네임은 사용자끼리 겹치지 않음 (영문 대소문자는 같은 것으로 봄)
+create unique index profiles_nickname_key on public.profiles (lower(nickname));

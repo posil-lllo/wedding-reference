@@ -342,13 +342,20 @@ async function logout() {
 const profileDlg = document.getElementById('profile');
 const profileForm = document.getElementById('profile-form');
 const profileErr = document.getElementById('profile-err');
+const nickMsg = document.getElementById('nick-msg');
+const setNickMsg = (text) => {
+  nickMsg.textContent = text;
+  nickMsg.hidden = !text;
+  profileForm.nickname.toggleAttribute('aria-invalid', Boolean(text));
+};
+profileForm.nickname.addEventListener('input', () => setNickMsg(''));
 
 const showNickname = () => { document.getElementById('my-name').textContent = profile.nickname; };
 async function ensureProfile(ask) {
   profile = must(await sb.from('profiles').select('nickname,role,character').maybeSingle());
   if (profile?.nickname && profile.role) return showNickname();
   if (!ask) return;
-  profileForm.nickname.value = profile?.nickname || (user.name === '이름 없음' ? '' : user.name); // 있는 값, 없으면 카카오 닉네임
+  profileForm.nickname.value = profile?.nickname || '';
   if (profile?.role) profileForm.role.value = profile.role;
   profileDlg.showModal();
 }
@@ -357,7 +364,10 @@ profileForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const nickname = profileForm.nickname.value.trim();
   const role = profileForm.role.value;
-  if (!nickname) return profileForm.nickname.focus();
+  if (!nickname) {
+    setNickMsg('닉네임을 입력해 주세요.');
+    return profileForm.nickname.focus();
+  }
   const btn = profileForm.querySelector('button');
   btn.disabled = true;
   profileErr.hidden = true;
@@ -367,6 +377,10 @@ profileForm.addEventListener('submit', async (e) => {
     showNickname();
     track('profile_done', { role });
   } catch (err) {
+    if (err.code === '23505') { // 닉네임 unique 위반
+      setNickMsg('이미 쓰고 있는 닉네임이에요. 다른 닉네임을 입력해 주세요.');
+      return profileForm.nickname.focus();
+    }
     console.error('profile save failed', err);
     profileErr.textContent = '저장하지 못했어요. 잠시 뒤 다시 눌러 주세요.';
     profileErr.hidden = false;

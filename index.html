@@ -91,7 +91,7 @@
 <dialog class="crop onboard" id="profile" aria-labelledby="profile-h">
   <form id="profile-form">
     <p class="crop-h" id="profile-h">반가워요! 처음 한 번만 알려 주세요</p>
-    <label class="onboard-f">닉네임<input class="in" name="nickname" maxlength="20" required autocomplete="nickname"></label>
+    <label class="onboard-f">닉네임<input class="in" name="nickname" maxlength="20" autocomplete="nickname" aria-describedby="nick-msg"><span class="onboard-msg" id="nick-msg" aria-live="polite" hidden></span></label>
     <div class="onboard-f">저는<div class="seg" role="radiogroup" aria-label="신랑 또는 신부">
       <label><input type="radio" name="role" value="groom" required>신랑</label><label><input type="radio" name="role" value="bride">신부</label>
     </div></div>
