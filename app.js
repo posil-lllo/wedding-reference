@@ -117,6 +117,7 @@ function scheduleSave() {
   clearTimeout(saveTimer);
   setStatus('저장 중…');
   saveTimer = setTimeout(async () => {
+    saveTimer = null; // 로그아웃이 남은 저장을 알 수 있게
     try {
       await idb('readwrite', (s) => s.put(state, 'current'));
       await syncDraft(state); // account.js

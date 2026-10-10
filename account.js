@@ -278,7 +278,16 @@ async function newDraft() {
   }
 }
 async function logout() {
-  if (!confirm('로그아웃할까요? 지금 화면의 내용은 이 기기에 그대로 남아요.')) return;
+  if (!confirm('로그아웃할까요?')) return;
+  // 아직 서버에 안 올라간 수정이 있으면 로그인 상태일 때 먼저 올린다
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    try {
+      await idb('readwrite', (s) => s.put(state, 'current'));
+      await syncDraft(state);
+    } catch (e) { console.error('save before logout failed', e); }
+  }
   try {
     await backend.logout();
   } catch (e) {
