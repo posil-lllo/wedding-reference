@@ -96,22 +96,41 @@ const backend = {
 
 let user = null;
 let draftId = null;
-const setDraftId = (id) => {
+// syncedAt: 이 브라우저가 마지막으로 불러오거나 저장한 서버 시각. 서버 값과 다르면 다른 창·기기가 그 뒤에 저장한 것
+let syncedAt = 0;
+const setDraftId = (id, at = 0) => {
   draftId = id;
-  if (id) localStorage.setItem('wr-draft', id);
-  else localStorage.removeItem('wr-draft');
+  syncedAt = at;
+  if (id) {
+    localStorage.setItem('wr-draft', id);
+    localStorage.setItem('wr-synced', String(at));
+  } else {
+    localStorage.removeItem('wr-draft');
+    localStorage.removeItem('wr-synced');
+  }
 };
 
 const defaultName = (s) => [s.basic.groom, s.basic.bride].filter(Boolean).join(' · ') || '이름 없는 시안';
 const hasContent = (s) => JSON.stringify(withoutBlanks(s)) !== JSON.stringify(withoutBlanks({ ...DEFAULT_STATE, pointColor: s.pointColor }));
 
 // scheduleSave 가 로컬 저장 뒤 부름. 로그인 상태면 작업 중인 시안에도 저장
-async function syncDraft(s) {
+// 앞 저장이 끝난 뒤에 다음 저장을 시작함 (겹치면 자기 저장을 다른 창의 수정으로 잘못 봄)
+let syncing = Promise.resolve();
+function syncDraft(s) {
+  const run = syncing.then(() => syncOnce(s));
+  syncing = run.catch(() => {});
+  return run;
+}
+async function syncOnce(s) {
   if (!user || !draftId) return;
   const prev = await backend.get(user.id, draftId);
+  if (prev && prev.updatedAt !== syncedAt
+    && confirm('다른 창이나 기기에서 이 시안이 수정됐어요.\n최신 내용을 불러올까요? 취소하면 지금 화면 내용으로 저장해요.')) return openDraft(prev);
   // 직접 바꾼 이름은 유지, 자동 이름이면 입력한 신랑·신부 이름을 따라감
   const isAutoName = !prev || prev.name === defaultName(prev.data);
-  await backend.put(user.id, { id: draftId, name: isAutoName ? defaultName(s) : prev.name, updatedAt: Date.now(), data: s });
+  const d = { id: draftId, name: isAutoName ? defaultName(s) : prev.name, updatedAt: Date.now(), data: s };
+  await backend.put(user.id, d);
+  setDraftId(d.id, d.updatedAt);
 }
 
 // 시안이 이미 MAX_DRAFTS 개면 안내만 하고 false (서버 트리거도 같은 제한)
@@ -122,15 +141,16 @@ async function createDraft(s) {
   }
   const d = { id: uid(), name: defaultName(s), updatedAt: Date.now(), data: s };
   await backend.put(user.id, d);
-  setDraftId(d.id);
+  setDraftId(d.id, d.updatedAt);
   return true;
 }
 
-function loadIntoEditor(data) {
+// view 를 null 로 주면 지금 화면은 그대로 두고 내용만 바꿈
+function loadIntoEditor(data, view = 'edit') {
   state = restore(data);
   applyPointColor(state.pointColor);
   renderEditor();
-  show('edit');
+  if (view) show(view);
   scheduleSave();
 }
 
@@ -197,10 +217,12 @@ async function login() {
   }
 }
 
-async function openDraft(d) {
+// 사진을 다 받은 뒤에 작업 중인 시안을 바꿈 (중간에 실패하면 원래 시안 그대로)
+async function openDraft(d, view = 'edit') {
   setStatus('시안 불러오는 중…');
-  setDraftId(d.id);
-  loadIntoEditor(await toLocal(d.data));
+  const data = await toLocal(d.data);
+  setDraftId(d.id, d.updatedAt);
+  loadIntoEditor(data, view);
 }
 
 const myMenu = document.getElementById('my-menu');
@@ -231,9 +253,11 @@ draftsEl.addEventListener('click', async (e) => {
   const b = e.target.closest('button');
   if (!b) return;
   if (b.dataset.open) {
-    if (b.dataset.open === draftId) return show('edit');
     try {
-      await openDraft(await backend.get(user.id, b.dataset.open));
+      const d = await backend.get(user.id, b.dataset.open);
+      // 작업 중인 시안이고 그 뒤로 다른 곳에서 저장한 적이 없으면 화면만 넘김
+      if (d.id === draftId && d.updatedAt === syncedAt) return show('edit');
+      await openDraft(d);
       track('open_draft');
     } catch (err) {
       console.error('open draft failed', err);
@@ -311,6 +335,7 @@ async function logout() {
   try {
     user = await backend.session();
     draftId = user && localStorage.getItem('wr-draft');
+    syncedAt = Number(localStorage.getItem('wr-synced')) || 0;
     renderAuth();
     if (viewFromHash() === 'my') {
       if (user) renderView('my');
@@ -319,6 +344,11 @@ async function logout() {
     if (user && sessionStorage.getItem(LOGIN_FLAG)) {
       sessionStorage.removeItem(LOGIN_FLAG);
       await afterLogin();
+    } else if (user && draftId) {
+      // 다른 창·기기에서 이 시안을 더 저장했으면 그 내용으로 바꿔 둠
+      const d = await backend.get(user.id, draftId);
+      if (d && d.updatedAt !== syncedAt) await openDraft(d, null);
+      setStatus('');
     }
   } catch (e) {
     console.error('auth init failed', e);
