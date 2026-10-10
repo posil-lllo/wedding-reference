@@ -338,7 +338,7 @@ async function logout() {
   show('edit');
 }
 
-// ── 프로필: 처음 로그인한 사용자에게 닉네임과 신랑·신부를 받음 ──
+// ── 프로필: 닉네임이나 신랑·신부가 비어 있는 사용자에게 받음 (신규·기존 사용자 모두) ──
 const profileDlg = document.getElementById('profile');
 const profileForm = document.getElementById('profile-form');
 const profileErr = document.getElementById('profile-err');
@@ -346,8 +346,9 @@ const profileErr = document.getElementById('profile-err');
 const showNickname = () => { document.getElementById('my-name').textContent = profile.nickname; };
 async function ensureProfile() {
   profile = must(await sb.from('profiles').select('nickname,role,character').maybeSingle());
-  if (profile) return showNickname();
-  profileForm.nickname.value = user.name === '이름 없음' ? '' : user.name; // 카카오 닉네임을 기본값으로
+  if (profile?.nickname && profile.role) return showNickname();
+  profileForm.nickname.value = profile?.nickname || (user.name === '이름 없음' ? '' : user.name); // 있는 값, 없으면 카카오 닉네임
+  if (profile?.role) profileForm.role.value = profile.role;
   profileDlg.showModal();
 }
 profileDlg.addEventListener('cancel', (e) => e.preventDefault()); // Esc 로 닫히지 않게
@@ -360,7 +361,7 @@ profileForm.addEventListener('submit', async (e) => {
   btn.disabled = true;
   profileErr.hidden = true;
   try {
-    profile = must(await sb.from('profiles').insert({ nickname, role }).select('nickname,role,character').single());
+    profile = must(await sb.from('profiles').upsert({ user_id: user.id, nickname, role }).select('nickname,role,character').single());
     profileDlg.close();
     showNickname();
     track('profile_done', { role });
@@ -398,7 +399,7 @@ profileForm.addEventListener('submit', async (e) => {
     console.error('auth init failed', e);
     setStatus('로그인 상태를 확인하지 못했어요', true);
   }
-  // 프로필이 없으면(처음 로그인) 닉네임·신랑신부 입력 창. 실패해도 다른 기능은 그대로 씀
+  // 닉네임·신랑신부가 비어 있으면 입력 창. 실패해도 다른 기능은 그대로 씀
   if (user) ensureProfile().catch((e) => console.error('profile load failed', e));
 })();
 renderAuth();
