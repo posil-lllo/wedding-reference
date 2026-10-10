@@ -124,6 +124,7 @@ textarea.in { min-height: 64px; resize: vertical; }
 .pills label:has(input:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: 2px; }
 .onboard-msg { font-size: 12px; color: var(--dislike); }
 .onboard .note.err { margin: 10px 0 0; color: var(--dislike); }
+#profile-x { font-size: 14px; }
 .onboard-go { width: 100%; margin-top: 18px; padding: 10px; }
 .onboard[data-mode="onboard"] #profile-x, .onboard[data-mode="profile"] [data-for="date"], .onboard[data-mode="date"] [data-for="profile"] { display: none; }
 .onboard .seg.tri { grid-template-columns: repeat(3, 1fr); }
