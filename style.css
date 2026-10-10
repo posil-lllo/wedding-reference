@@ -233,10 +233,7 @@ body:not(.authed) [data-save-draft] { display: none; }
   .grid.basic { grid-template-columns: 1fr; }
   /* 일정: 시작·종료 시간만 반씩 나란히, 나머지는 한 줄씩 */
   .grid.sched > :nth-last-child(n+3) { grid-column: 1 / -1; }
-  .brand { flex-basis: 100%; }
   .pair { grid-template-columns: 1fr; }
-  .top-r { margin-left: 0; width: 100%; }
-  .top-r .tabs { margin-right: auto; }
   .pdf-bar .btn { max-width: none; }
 }
 html { scroll-behavior: smooth; }
@@ -250,7 +247,6 @@ html { scroll-behavior: smooth; }
 .login-cta { margin-right: auto; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
 /* 홈 */
 body:is([data-view="home"], [data-view="mbti"]) :is(.tabs, [popovertarget="toc"]) { display: none; }
-@media (max-width: 760px) { body:is([data-view="home"], [data-view="mbti"]) .brand { flex-basis: auto; } body:is([data-view="home"], [data-view="mbti"]) .top-r { margin-left: auto; width: auto; } }
 /* 성향 테스트: 상단바 아래를 iframe 으로 꽉 채움 */
 body[data-view="mbti"] { display: flex; flex-direction: column; height: 100dvh; }
 .mbti { flex: 1; min-height: 0; }

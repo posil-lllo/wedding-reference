@@ -26,6 +26,10 @@
 <body data-view="home">
 <div class="top"><div class="top-in">
   <button class="brand" data-view="home" aria-label="홈으로">Posil</button>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="false" data-view="edit">입력</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="view">결과 미리보기</button>
+  </div>
   <span class="status" id="status" role="status"></span><button class="info" id="save-info" popovertarget="save-help" aria-label="임시 저장 실패 안내" hidden>i</button>
   <div class="help" id="save-help" popover>
     <b>임시 저장이 안 된 상태예요</b>
@@ -38,10 +42,6 @@
     </ul>
   </div>
   <div class="top-r">
-    <div class="tabs" role="tablist">
-      <button class="tab" role="tab" aria-selected="false" data-view="edit">입력</button>
-      <button class="tab" role="tab" aria-selected="false" data-view="view">결과 미리보기</button>
-    </div>
     <button class="iconbtn" popovertarget="toc" aria-label="목차"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r=".8"/><circle cx="4.5" cy="12" r=".8"/><circle cx="4.5" cy="18" r=".8"/></svg></button>
     <nav class="help toc" id="toc" popover aria-label="목차"></nav>
     <button class="iconbtn" popovertarget="fb" aria-label="문의·피드백" title="문의·피드백"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 14v-2a7.5 7.5 0 0 1 15 0v2"/><rect x="3.5" y="13" width="4" height="5.5" rx="1.6"/><rect x="16.5" y="13" width="4" height="5.5" rx="1.6"/><path d="M18.5 18.5v.5a2.5 2.5 0 0 1-2.5 2.5h-2.5"/></svg></button>
