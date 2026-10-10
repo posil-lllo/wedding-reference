@@ -578,7 +578,9 @@ pointHex.addEventListener('blur', () => {
 // ── 탭 · 결과 ──
 const deckEl = document.getElementById('deck');
 // 화면마다 주소(#/edit 등)를 달리 둬서 새로고침·뒤로 가기에도 그 화면이 유지됨
-const VIEWS = ['home', 'mbti', 'edit', 'view', 'my'];
+const VIEWS = ['home', 'edit', 'view', 'my'];
+// 성향 테스트는 mbti/ 로 옮김. 예전 #/mbti 주소로 들어오면 넘겨 줌
+if (location.hash === '#/mbti') location.replace('mbti/');
 const viewFromHash = () => {
   const v = location.hash.slice(2);
   return VIEWS.includes(v) ? v : 'home';

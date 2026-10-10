@@ -124,3 +124,5 @@ a.choice { display: block; text-decoration: none; }
 .answers p { margin: 0; line-height: 1.6; }
 .answers .q { color: var(--muted); font-size: 14px; }
 .answers .a { font-weight: 600; }
+
+.home-link { display: block; width: fit-content; margin: -24px 0 16px; font: 26px "Pinyon Script", cursive; color: #6d93bd; text-decoration: none; line-height: 1; }
