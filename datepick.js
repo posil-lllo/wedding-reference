@@ -41,7 +41,8 @@ function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {})
   const grids = {
     day: ({ y, m }) => {
       const { date, range } = draft;
-      const [from, to] = date && range ? [addMonths(date, -range), addMonths(date, range)] : [];
+      const back = date && range ? addMonths(date, -range) : '';
+      const [from, to] = back ? [back < today ? today : back, addMonths(date, range)] : []; // 범위는 오늘부터
       let cells = WEEK.split('').map((w) => `<i>${w}</i>`).join('') + '<span></span>'.repeat(new Date(y, m, 1).getDay());
       for (let d = 1, last = new Date(y, m + 1, 0).getDate(); d <= last; d++) {
         const v = isoOf(y, m, d);
