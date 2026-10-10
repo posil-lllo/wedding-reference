@@ -55,8 +55,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .wrap { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 64px; }
 .note { font-size: 12px; color: var(--muted); }
-/* 버튼 줄 폭에 맞춰 오른쪽에 두고, '오늘 하루 보지 않기'는 그 왼쪽 끝(그냥 하기 아래)에 맞춤 */
-.ask-acts { width: fit-content; margin-left: auto; }
+#login-ask .crop-btns { display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; } /* 두 버튼이 같은 크기로 팝업 너비를 반씩 채움 */
+#login-ask .crop-btns > * { justify-content: center; }
 .ask-skip { display: block; margin: 10px 0 0; padding: 0; border: 0; background: none; cursor: pointer; }
 
 /* 입력 화면 */
@@ -145,10 +145,10 @@ textarea.in { min-height: 64px; resize: vertical; }
 .add-img input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .add-img:has(input:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: 2px; }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.grid.two { grid-template-columns: 1fr 1fr; }
+.grid.two { grid-template-columns: 1fr 1fr; align-items: stretch; }
 .grid.three { grid-template-columns: repeat(3, 1fr); }
 /* 일정: 이름·(방식|작가|선생님) / 링크 / 시작·종료 */
-.grid.sched { grid-template-columns: 1fr 1fr; }
+.grid.sched { grid-template-columns: 1fr 1fr; align-items: stretch; }
 .grid.sched > :nth-last-child(3) { grid-column: 1 / -1; }
 
 .item { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; background: #fff; }
