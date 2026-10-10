@@ -6,6 +6,16 @@
   <title>캐릭터 모아 보기</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pinyon+Script&text=Posil&display=swap">
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-N1LGWGD5MF"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    // 웨딩 레퍼런스와 같은 속성. ?notrack 으로 한 번 들어온 브라우저는 빠짐 (../index.html 과 같은 키)
+    try { window['ga-disable-G-N1LGWGD5MF'] = localStorage.getItem('wr-notrack') === '1'; } catch (e) {}
+    gtag('js', new Date());
+    gtag('config', 'G-N1LGWGD5MF');
+  </script>
   <style>
     #app { max-width: 720px; padding-bottom: 120px; }
     .cta { position: fixed; left: 0; right: 0; bottom: 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, var(--bg) 40%); }
@@ -28,6 +38,7 @@
 </head>
 <body>
   <main id="app" class="screen">
+    <a class="home-link" href="../" aria-label="Posil 홈으로">Posil</a>
     <h1>결혼 준비 캐릭터</h1>
     <div id="list"></div>
   </main>

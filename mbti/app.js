@@ -1,5 +1,6 @@
 const QUESTIONS = [...VALUE_QUESTIONS, ...STYLE_QUESTIONS];
 const $ = (id) => document.getElementById(id);
+const track = (name, params = {}) => window.gtag?.("event", name, params);
 
 let gender = "여자";
 let answers = [];
@@ -51,7 +52,13 @@ function renderQuestion() {
     b.className = n === ahead[0] ? "choice selected" : "choice";
     b.textContent = o.text;
     // 문항끼리는 독립이라 답을 바꿔도 뒤 질문 답은 그대로 둔다.
-    b.onclick = () => { ahead.shift(); answers.push(n); renderQuestion(); };
+    b.onclick = () => {
+      ahead.shift();
+      answers.push(n);
+      // 새로고침으로 결과를 다시 볼 때는 세지 않도록 마지막 답을 고른 순간에만
+      if (answers.length === QUESTIONS.length) track("mbti_complete", { gender, character: CHARACTERS[decide().key].name });
+      renderQuestion();
+    };
     return b;
   }));
   $("back").hidden = i === 0;
@@ -59,10 +66,11 @@ function renderQuestion() {
   show("quiz");
 }
 
+const decide = () => decideCharacter(
+  answers.slice(0, VALUE_QUESTIONS.length), answers.slice(VALUE_QUESTIONS.length), { VALUE_QUESTIONS, STYLE_QUESTIONS });
+
 function renderResult() {
-  const valueAnswers = answers.slice(0, VALUE_QUESTIONS.length);
-  const styleAnswers = answers.slice(VALUE_QUESTIONS.length);
-  const { key, value, valuePercent, stylePercent } = decideCharacter(valueAnswers, styleAnswers, { VALUE_QUESTIONS, STYLE_QUESTIONS });
+  const { key, value, valuePercent, stylePercent } = decide();
   const c = CHARACTERS[key];
   resultKey = key;
 
@@ -153,7 +161,7 @@ function renderBars(id, percent, names) {
 }
 
 for (const b of document.querySelectorAll("[data-gender]")) {
-  b.onclick = () => { gender = b.dataset.gender; answers = []; ahead = []; renderQuestion(); };
+  b.onclick = () => { gender = b.dataset.gender; answers = []; ahead = []; track("mbti_start", { gender }); renderQuestion(); };
 }
 $("back").onclick = () => { ahead.unshift(answers.pop()); renderQuestion(); };
 $("next").onclick = () => { answers.push(ahead.shift()); renderQuestion(); };
@@ -164,6 +172,7 @@ if (hasKakao && !Kakao.isInitialized()) Kakao.init(KAKAO_KEY);
 $("share").hidden = !hasKakao;
 $("share").onclick = () => {
   const c = CHARACTERS[resultKey];
+  track("mbti_share", { method: "kakao", character: c.name });
   const home = new URL(".", location.href).href;
   const detail = `${home}characters.html?c=${resultKey}&g=${encodeURIComponent(gender)}`;
   Kakao.Share.sendDefault({
@@ -182,6 +191,7 @@ $("share").onclick = () => {
 };
 $("story").onclick = async () => {
   if (!storyFile) return;
+  track("mbti_share", { method: "story", character: CHARACTERS[resultKey].name });
   if (!navigator.canShare?.({ files: [storyFile] })) return downloadStory();
   try {
     await navigator.share({ files: [storyFile] });
