@@ -156,7 +156,7 @@ textarea.in { min-height: 64px; resize: vertical; }
 .cal-g.days button[aria-pressed="true"]::before { background: var(--accent); }
 .cal-r { margin-top: 14px; gap: 6px; }
 .cal .cal-r button { flex: auto; padding: 6px 10px; font-size: 12px; white-space: nowrap; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); }
-.cal .cal-r button[aria-pressed="true"] { background: #e3edf9; border-color: #c3d6ee; color: var(--accent-text); }
+.cal .cal-r button[aria-pressed="true"] { background: #e3edf9; border-color: #c3d6ee; }
 .cal .cal-done { width: 100%; margin-top: 14px; padding: 10px; border-radius: 6px; background: var(--accent); color: #fff; }
 .crop-stage { position: relative; margin: 0 auto 14px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
 #crop-cv { display: block; width: 100%; height: 100%; }
