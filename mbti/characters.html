@@ -91,7 +91,7 @@
         const frame = document.createElement("div");
         frame.className = "frame";
         const img = document.createElement("img");
-        img.src = encodeURI(`서있는모습/${c.image}-${gender}.png`);
+        img.src = encodeURI(`썸네일/${c.image}-${gender}.webp`); // 리스트는 작은 그림, 상세 팝업은 원본
         img.alt = `${c.name} ${label}`;
         frame.append(img);
         cell.append(frame, label);
