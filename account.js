@@ -244,6 +244,8 @@ document.addEventListener('click', (e) => {
   else if (t.closest('[data-save-draft]')) saveDraft(true);
   else if (t.closest('[data-new-draft]')) newDraft();
   else if (t.closest('[data-logout]')) logout();
+  // 메뉴를 닫은 뒤 상담원 아이콘과 같은 문의 창을 띄움
+  else if (t.closest('[data-fb]')) document.getElementById('fb').showPopover();
 });
 
 draftsEl.addEventListener('change', async (e) => {
