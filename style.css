@@ -144,13 +144,13 @@ textarea.in { min-height: 64px; resize: vertical; }
 .cal-g .today { color: var(--accent-text); }
 .cal-g.wide button[aria-pressed="true"] { background: #e3edf9; color: var(--accent-text); }
 .cal button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: -2px; }
-/* 날짜 칸: 동그라미는 ::before, 오차 범위는 칸 배경 띠로 그림 */
+/* 날짜 칸: 동그라미는 ::before, 오차 범위는 동그라미보다 낮은 칸 배경 띠로 그림 */
 .cal-g.days button { position: relative; isolation: isolate; border-radius: 0; }
 .cal-g.days button::before { content: ''; position: absolute; inset: 3px; border-radius: 50%; z-index: -1; }
 .cal-g.days button:hover:not(:disabled, [aria-pressed="true"], .range-start, .range-end)::before { background: var(--ivory); }
-.cal-g.days .in-range { background: #f1f6fc; color: var(--accent-text); }
-.cal-g.days .range-start { background: linear-gradient(90deg, transparent 50%, #f1f6fc 50%); }
-.cal-g.days .range-end { background: linear-gradient(90deg, #f1f6fc 50%, transparent 50%); }
+.cal-g.days .in-range { --band: #f1f6fc; background: linear-gradient(var(--band), var(--band)) center / 100% 64% no-repeat; color: var(--accent-text); }
+.cal-g.days .range-start { background-image: linear-gradient(90deg, transparent 50%, var(--band) 50%); }
+.cal-g.days .range-end { background-image: linear-gradient(90deg, var(--band) 50%, transparent 50%); }
 .cal-g.days :is(.range-start, .range-end)::before { background: #d6e5f6; }
 .cal-g.days button[aria-pressed="true"] { color: #fff; }
 .cal-g.days button[aria-pressed="true"]::before { background: var(--accent); }
