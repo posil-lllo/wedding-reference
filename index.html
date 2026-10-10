@@ -78,8 +78,12 @@
   <section class="profile">
     <div class="avatar" id="my-avatar" aria-hidden="true"></div>
     <div class="profile-info">
-      <h1 id="my-name"></h1>
-      <p class="note" id="my-count"></p>
+      <div class="name-row">
+        <h1 id="my-name"></h1>
+        <button class="iconbtn" popovertarget="prof-menu" aria-label="프로필 메뉴"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5.5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="18.5" r="1.6"/></svg></button>
+        <nav class="help my-menu" id="prof-menu" popover aria-label="프로필 메뉴"><button data-edit="profile">프로필 수정</button><button data-edit="date">결혼 예정 날짜 수정</button></nav>
+      </div>
+      <p class="note" id="my-date"></p>
       <div class="profile-btns"><button class="btn" data-new-draft>+ 새 시안 만들기</button></div>
     </div>
   </section>
@@ -91,18 +95,18 @@
   <form id="profile-form">
     <div id="profile-main">
     <p class="crop-h" id="profile-h">반가워요! 처음 한 번만 알려 주세요</p>
-    <label class="onboard-f">닉네임<input class="in" name="nickname" maxlength="20" autocomplete="nickname" aria-describedby="nick-msg"><span class="onboard-msg" id="nick-msg" aria-live="polite" hidden></span></label>
-    <div class="onboard-f">저는<div class="seg" role="radiogroup" aria-label="신랑 또는 신부">
+    <label class="onboard-f" data-for="profile">닉네임<input class="in" name="nickname" maxlength="20" autocomplete="nickname" aria-describedby="nick-msg"><span class="onboard-msg" id="nick-msg" aria-live="polite" hidden></span></label>
+    <div class="onboard-f" data-for="profile">저는<div class="seg" role="radiogroup" aria-label="신랑 또는 신부">
       <label><input type="radio" name="role" value="groom" required>신랑</label><label><input type="radio" name="role" value="bride">신부</label>
     </div></div>
-    <div class="onboard-f">결혼 예정일 (선택)
+    <div class="onboard-f" data-for="date">결혼 예정일 (선택)
       <button type="button" class="in date-btn empty" id="wd-btn" aria-expanded="false" aria-controls="wd-cal">날짜 선택</button>
       <div class="seg tri" id="wd-range" role="radiogroup" aria-label="날짜 정확도" hidden>
         <label><input type="radio" name="wdRange" value="0" checked>정확해요</label><label><input type="radio" name="wdRange" value="1">±1개월</label><label><input type="radio" name="wdRange" value="3">±3개월</label>
       </div>
     </div>
     <p class="note err" id="profile-err" role="alert" hidden></p>
-    <button class="btn onboard-go">시작하기</button>
+    <div class="onboard-btns"><button type="button" class="btn soft" id="profile-cancel">취소</button><button class="btn onboard-go">시작하기</button></div>
     </div>
     <div id="wd-view" hidden>
       <p class="crop-h">결혼 예정일</p>

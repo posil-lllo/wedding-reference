@@ -194,8 +194,7 @@ async function renderMyPage() {
   const list = await backend.list();
   const covers = await backend.signedUrls([...new Set(list.map((d) => photoPaths(d.data)[0]).filter(Boolean))]);
   document.getElementById('my-avatar').innerHTML = user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : DEFAULT_AVATAR;
-  document.getElementById('my-name').textContent = profile?.nickname || user.name;
-  document.getElementById('my-count').textContent = `촬영 시안 ${list.length}개`;
+  showProfile();
   draftsEl.innerHTML = list.map((d) => draftCard(d, covers[photoPaths(d.data)[0]])).join('') || '<p class="note">저장된 시안이 없어요</p>';
 }
 
@@ -230,21 +229,21 @@ async function openDraft(d, view = 'edit') {
   loadIntoEditor(data, view);
 }
 
-const myMenu = document.getElementById('my-menu');
-// 아이콘 바로 아래, 오른쪽 끝을 맞춰 드롭다운처럼
-myMenu.addEventListener('beforetoggle', (e) => {
+// 메뉴를 여는 아이콘 바로 아래, 오른쪽 끝을 맞춰 드롭다운처럼
+document.querySelectorAll('.my-menu').forEach((menu) => menu.addEventListener('beforetoggle', (e) => {
   if (e.newState !== 'open') return;
-  const r = myBtn.getBoundingClientRect();
-  myMenu.style.top = `${r.bottom + 6}px`;
-  myMenu.style.right = `${Math.max(8, innerWidth - r.right)}px`;
-});
+  const r = document.querySelector(`[popovertarget="${menu.id}"]`).getBoundingClientRect();
+  menu.style.top = `${r.bottom + 6}px`;
+  menu.style.right = `${Math.max(8, innerWidth - r.right)}px`;
+}));
 document.addEventListener('click', (e) => {
   const t = e.target;
-  if (myMenu.contains(t) && t.closest('button')) myMenu.hidePopover();
+  if (t.closest('.my-menu button')) t.closest('.my-menu').hidePopover();
   if (t.closest('[data-login]')) login();
   else if (t.closest('[data-save-draft]')) saveDraft(true);
   else if (t.closest('[data-new-draft]')) newDraft();
   else if (t.closest('[data-logout]')) logout();
+  else if (t.closest('[data-edit]')) openProfile(t.closest('[data-edit]').dataset.edit);
   // 메뉴를 닫은 뒤 상담원 아이콘과 같은 문의 창을 띄움
   else if (t.closest('[data-fb]')) document.getElementById('fb').showPopover();
 });
@@ -352,18 +351,42 @@ const wdPicker = datePicker(document.getElementById('wd-btn'), document.getEleme
   },
 });
 
-const showNickname = () => { document.getElementById('my-name').textContent = profile.nickname; };
+const weddingText = () => {
+  if (!profile?.wedding_date) return '결혼 예정 날짜 미정';
+  const [y, m, d] = profile.wedding_date.split('-').map(Number);
+  const range = profile.wedding_date_range ? ` (±${profile.wedding_date_range}개월)` : '';
+  return `결혼 예정 ${y}년 ${m}월 ${d}일${range}`;
+};
+const showProfile = () => {
+  document.getElementById('my-name').textContent = profile?.nickname || user.name;
+  document.getElementById('my-date').textContent = weddingText();
+};
 async function ensureProfile(ask) {
   profile = must(await sb.from('profiles').select('nickname,role,character,wedding_date,wedding_date_range').maybeSingle());
-  if (profile?.nickname && profile.role) return showNickname();
-  if (!ask) return;
+  if (profile?.nickname && profile.role) return showProfile();
+  if (ask) openProfile('onboard');
+}
+// onboard: 처음 받기(닫을 수 없음), profile: 닉네임·신랑신부 수정, date: 결혼 예정일 수정
+const PROFILE_MODES = {
+  onboard: ['반가워요! 처음 한 번만 알려 주세요', '시작하기'],
+  profile: ['프로필 수정', '저장'],
+  date: ['결혼 예정 날짜 수정', '저장'],
+};
+function openProfile(mode) {
+  const [title, go] = PROFILE_MODES[mode];
+  profileDlg.dataset.mode = mode;
+  document.getElementById('profile-h').textContent = title;
+  profileForm.querySelector('.onboard-go').textContent = go;
   profileForm.nickname.value = profile?.nickname || '';
   if (profile?.role) profileForm.role.value = profile.role;
   wdPicker.value = profile?.wedding_date;
   profileForm.wdRange.value = String(profile?.wedding_date_range ?? 0);
+  setNickMsg('');
+  profileErr.hidden = true;
   profileDlg.showModal();
 }
-profileDlg.addEventListener('cancel', (e) => e.preventDefault()); // Esc 로 닫히지 않게
+profileDlg.addEventListener('cancel', (e) => { if (profileDlg.dataset.mode === 'onboard') e.preventDefault(); }); // 처음 받을 때는 Esc 로 닫히지 않게
+document.getElementById('profile-cancel').addEventListener('click', () => profileDlg.close());
 profileForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const nickname = profileForm.nickname.value.trim();
@@ -382,8 +405,8 @@ profileForm.addEventListener('submit', async (e) => {
       wedding_date_range: wdPicker.value ? Number(profileForm.wdRange.value) : null, // 오차(개월), 0 은 정확한 날짜
     }).select('nickname,role,character,wedding_date,wedding_date_range').single());
     profileDlg.close();
-    showNickname();
-    track('profile_done', { role });
+    showProfile();
+    track(profileDlg.dataset.mode === 'onboard' ? 'profile_done' : 'profile_edit', { role });
   } catch (err) {
     if (err.code === '23505') { // 닉네임 unique 위반
       setNickMsg('이미 쓰고 있는 닉네임이에요. 다른 닉네임을 입력해 주세요.');

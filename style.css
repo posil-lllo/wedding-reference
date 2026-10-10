@@ -119,7 +119,9 @@ textarea.in { min-height: 64px; resize: vertical; }
 .onboard .seg label:has(input:checked) { background: #e3edf9; color: var(--accent-text); }
 .onboard-msg { font-size: 12px; color: var(--dislike); }
 .onboard .note.err { margin: 10px 0 0; color: var(--dislike); }
-.onboard-go { width: 100%; margin-top: 18px; padding: 10px; }
+.onboard-btns { display: flex; gap: 8px; margin-top: 18px; }
+.onboard-btns .btn { flex: 1; padding: 10px; }
+.onboard[data-mode="onboard"] #profile-cancel, .onboard[data-mode="profile"] [data-for="date"], .onboard[data-mode="date"] [data-for="profile"] { display: none; }
 .onboard .seg.tri { grid-template-columns: repeat(3, 1fr); }
 .date-btn { text-align: left; cursor: pointer; }
 .date-btn.empty { color: var(--muted); }
@@ -288,6 +290,7 @@ button.brand { border: 0; background: none; padding: 0; cursor: pointer; text-al
 .avatar-def .stem { fill: none; stroke: #fff; stroke-width: 3.5; stroke-linecap: round; }
 .profile-info { display: grid; gap: 6px; min-width: 0; }
 .profile-info h1 { font-size: 22px; }
+.name-row { display: flex; align-items: center; gap: 2px; }
 .profile-info .note { margin: 0; font-size: 13px; }
 .profile-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
 .profile-btns .btn { padding: 5px 14px; font-size: 13px; }
