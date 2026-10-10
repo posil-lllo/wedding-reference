@@ -338,15 +338,16 @@ async function logout() {
   show('edit');
 }
 
-// ── 프로필: 닉네임이나 신랑·신부가 비어 있는 사용자에게 받음 (신규·기존 사용자 모두) ──
+// ── 프로필: 로그인한 직후 닉네임이나 신랑·신부가 비어 있으면 받음 (신규·기존 사용자 모두) ──
 const profileDlg = document.getElementById('profile');
 const profileForm = document.getElementById('profile-form');
 const profileErr = document.getElementById('profile-err');
 
 const showNickname = () => { document.getElementById('my-name').textContent = profile.nickname; };
-async function ensureProfile() {
+async function ensureProfile(ask) {
   profile = must(await sb.from('profiles').select('nickname,role,character').maybeSingle());
   if (profile?.nickname && profile.role) return showNickname();
+  if (!ask) return;
   profileForm.nickname.value = profile?.nickname || (user.name === '이름 없음' ? '' : user.name); // 있는 값, 없으면 카카오 닉네임
   if (profile?.role) profileForm.role.value = profile.role;
   profileDlg.showModal();
@@ -377,6 +378,7 @@ profileForm.addEventListener('submit', async (e) => {
 // 저장된 입력(app.js ready)을 먼저 불러온 뒤 로그인 상태를 이어 붙임
 (async () => {
   await ready;
+  let justLoggedIn = false;
   try {
     user = await backend.session();
     draftId = user && localStorage.getItem('wr-draft');
@@ -388,6 +390,7 @@ profileForm.addEventListener('submit', async (e) => {
     }
     if (user && sessionStorage.getItem(LOGIN_FLAG)) {
       sessionStorage.removeItem(LOGIN_FLAG);
+      justLoggedIn = true;
       await afterLogin();
     } else if (user && draftId) {
       // 다른 창·기기에서 이 시안을 더 저장했으면 그 내용으로 바꿔 둠
@@ -399,7 +402,7 @@ profileForm.addEventListener('submit', async (e) => {
     console.error('auth init failed', e);
     setStatus('로그인 상태를 확인하지 못했어요', true);
   }
-  // 닉네임·신랑신부가 비어 있으면 입력 창. 실패해도 다른 기능은 그대로 씀
-  if (user) ensureProfile().catch((e) => console.error('profile load failed', e));
+  // 로그인 직후에만, 닉네임·신랑신부가 비어 있으면 입력 창. 실패해도 다른 기능은 그대로 씀
+  if (user) ensureProfile(justLoggedIn).catch((e) => console.error('profile load failed', e));
 })();
 renderAuth();
