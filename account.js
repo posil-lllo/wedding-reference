@@ -175,10 +175,13 @@ async function renderMyPage() {
 }
 
 // 카카오에서 돌아온 직후 한 번: 비로그인으로 작업하던 내용이 있으면 새 시안으로 저장, 없으면 마지막 시안을 이어서
+// 시안이 이미 꽉 찼으면 작업 내용은 이 기기에만 두고 안내 팝업 없이 넘어감 (덮어쓰지 않음)
 async function afterLogin() {
   const list = await backend.list();
-  if (hasContent(state) || !list.length) await createDraft(state);
-  else await openDraft(list[0]);
+  if (!hasContent(state)) {
+    if (list.length) await openDraft(list[0]);
+    else await createDraft(state);
+  } else if (list.length < MAX_DRAFTS) await createDraft(state);
   setStatus('');
   track('login');
 }
