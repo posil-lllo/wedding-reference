@@ -127,7 +127,6 @@ textarea.in { min-height: 64px; resize: vertical; }
 #profile-x, #wd-x { font-size: 14px; }
 .onboard-go { width: 100%; margin-top: 18px; padding: 10px; }
 .onboard[data-mode="onboard"] :is(#profile-x, #wd-x), .onboard[data-mode="profile"] [data-for="date"], .onboard[data-mode="date"] [data-for="profile"] { display: none; }
-.onboard .seg.tri { grid-template-columns: repeat(3, 1fr); }
 .date-btn { text-align: left; cursor: pointer; }
 .date-btn.empty { color: var(--muted); }
 .cal { margin-top: 12px; color: var(--ink); }
@@ -140,13 +139,16 @@ textarea.in { min-height: 64px; resize: vertical; }
 .cal-g i { font-style: normal; font-size: 11px; color: var(--muted); padding: 2px 0; }
 .cal-g button { aspect-ratio: 1; font-size: 13px; }
 .cal-g.wide button { aspect-ratio: auto; height: 44px; }
-.cal button:hover:not(:disabled) { background: var(--ivory); }
+.cal :is(.cal-h, .cal-g) button:hover:not(:disabled) { background: var(--ivory); }
 .cal button:disabled { color: #cfcfcf; cursor: default; }
 .cal-g .today { color: var(--accent-text); }
 .cal-g button[aria-pressed="true"] { background: #e3edf9; color: var(--accent-text); }
 .cal button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: -2px; }
-.cal-f { display: flex; justify-content: space-between; margin-top: 12px; }
-.cal-f button { padding: 6px 10px; font-size: 13px; color: var(--muted); }
+.cal-g .in-range { background: #f1f6fc; color: var(--accent-text); }
+.cal-r { margin-top: 14px; gap: 6px; }
+.cal .cal-r button { flex: 1; padding: 6px 0; font-size: 12px; white-space: nowrap; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); }
+.cal .cal-r button[aria-pressed="true"] { background: #e3edf9; border-color: #c3d6ee; color: var(--accent-text); }
+.cal .cal-done { width: 100%; margin-top: 14px; padding: 10px; border-radius: 6px; background: var(--accent); color: #fff; }
 .crop-stage { position: relative; margin: 0 auto 14px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
 #crop-cv { display: block; width: 100%; height: 100%; }
 /* 3:4 박스: 바깥은 어둡게, 안은 3분할 격자 */

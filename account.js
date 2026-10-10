@@ -342,9 +342,7 @@ const setNickMsg = (text) => {
   profileForm.nickname.toggleAttribute('aria-invalid', Boolean(text));
 };
 profileForm.nickname.addEventListener('input', () => setNickMsg(''));
-const wdRange = document.getElementById('wd-range');
 const wdPicker = datePicker(document.getElementById('wd-btn'), document.getElementById('wd-cal'), {
-  onChange: (v) => { wdRange.hidden = !v; },
   onToggle: (open) => { // 달력은 프로필 입력 대신 같은 창에 보임
     document.getElementById('profile-main').hidden = open;
     document.getElementById('wd-view').hidden = !open;
@@ -379,8 +377,7 @@ function openProfile(mode) {
   profileForm.querySelector('.onboard-go').textContent = go;
   profileForm.nickname.value = profile?.nickname || '';
   if (profile?.role) profileForm.role.value = profile.role;
-  wdPicker.value = profile?.wedding_date;
-  profileForm.wdRange.value = String(profile?.wedding_date_range ?? 0);
+  wdPicker.value = { date: profile?.wedding_date, range: profile?.wedding_date_range };
   setNickMsg('');
   profileErr.hidden = true;
   profileDlg.showModal();
@@ -401,8 +398,8 @@ profileForm.addEventListener('submit', async (e) => {
   try {
     profile = must(await sb.from('profiles').upsert({
       user_id: user.id, nickname, role,
-      wedding_date: wdPicker.value || null,
-      wedding_date_range: wdPicker.value ? Number(profileForm.wdRange.value) : null, // 오차(개월), 0 은 정확한 날짜
+      wedding_date: wdPicker.value.date || null,
+      wedding_date_range: wdPicker.value.range, // 오차(개월), 0 은 정확한 날짜, 미정이면 null
     }).select('nickname,role,character,wedding_date,wedding_date_range').single());
     profileDlg.close();
     showProfile();
