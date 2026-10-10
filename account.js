@@ -7,6 +7,7 @@ const sb = supabase.createClient('https://yucqtbuefqjdoszhavzb.supabase.co', 'sb
 const BUCKET = 'photos';
 const LOGIN_FLAG = 'wr-login';
 const ASKED_FLAG = 'wr-login-asked';
+const SKIP_DAY = 'wr-login-ask-skip'; // '오늘 하루 보지 않기' 누른 날짜
 const MAX_DRAFTS = 2; // 서버 용량 때문에 계정당 시안 수 제한
 const must = ({ data, error }) => {
   if (error) throw error;
@@ -203,6 +204,7 @@ async function renderMyPage() {
 let authChecked = false;
 function askLogin() {
   if (!authChecked || user || sessionStorage.getItem(ASKED_FLAG)) return;
+  if (localStorage.getItem(SKIP_DAY) === new Date().toDateString()) return;
   sessionStorage.setItem(ASKED_FLAG, '1');
   document.getElementById('login-ask').showPopover();
 }
@@ -253,6 +255,7 @@ document.addEventListener('click', (e) => {
   else if (t.closest('[data-save-draft]')) saveDraft(true);
   else if (t.closest('[data-new-draft]')) newDraft();
   else if (t.closest('[data-logout]')) logout();
+  else if (t.closest('[data-skip-ask]')) localStorage.setItem(SKIP_DAY, new Date().toDateString()); // 닫기는 popovertarget 이 함
   // 메뉴를 닫은 뒤 상담원 아이콘과 같은 문의 창을 띄움
   else if (t.closest('[data-fb]')) document.getElementById('fb').showPopover();
 });
