@@ -44,6 +44,7 @@
 .inq-add { display: grid; place-items: center; width: 72px; height: 72px; border: 1px dashed #c9c6bb; border-radius: 6px; color: #6d93bd; font-size: 12px; cursor: pointer; }
 .inq-add input { position: absolute; opacity: 0; pointer-events: none; }
 .inq-add:focus-within { outline: 2px solid #6d93bd; outline-offset: 2px; }
+.inq:not(:has([name=kind][value=error]:checked)) .inq-when { display: none; }
 .inq-msg { margin: 0; min-height: 1.6em; color: #6d93bd; }
 .inq-msg.err { color: #b88378; }
 .inq-btns { display: flex; justify-content: flex-end; gap: 8px; }
@@ -61,7 +62,7 @@
     <fieldset><legend>문의 종류</legend><div class="inq-chips">${chips('kind', KINDS)}</div></fieldset>
     <fieldset><legend>대상 서비스</legend><div class="inq-chips">${chips('service', SERVICES, location.pathname.includes('/mbti/') ? 'mbti' : 'reference')}</div></fieldset>
     <label><span class="inq-label">내용</span><textarea name="body" maxlength="2000" required placeholder="어떤 화면에서 무엇을 하다가 생긴 일인지 적어 주시면 빨리 찾을 수 있어요."></textarea></label>
-    <label><span class="inq-label">문제가 생긴 시간 <small>(선택)</small></span><input type="text" name="occurred" maxlength="100" placeholder="예: 오늘 오후 3시쯤"></label>
+    <label class="inq-when"><span class="inq-label">문제가 생긴 시간 <small>(선택)</small></span><input type="text" name="occurred" maxlength="100" placeholder="예: 오늘 오후 3시쯤"></label>
     <div><span class="inq-label">참고 사진 <small>(${MAX_PHOTOS}장까지)</small></span><div class="inq-photos"></div></div>
     <label><span class="inq-label">안내받을 연락처 또는 메일 <small>(선택)</small></span><input type="text" name="contact" maxlength="100" autocomplete="email" placeholder="입력"></label>
     <p class="inq-msg" role="status"></p>
@@ -172,11 +173,15 @@
         must(await c.storage.from(BUCKET).upload(path, p.blob, { contentType: 'image/jpeg' }));
         return path;
       }));
-      const row = { kind: f.get('kind'), service: f.get('service'), body, contact: String(f.get('contact')).trim() || null, occurred: String(f.get('occurred')).trim() || null, photos: paths, page: location.href.slice(0, 300) };
+      // 문제가 생긴 시간 칸은 에러일 때만 보이므로 그때만 보냄
+      const occurred = (f.get('kind') === 'error' && String(f.get('occurred')).trim()) || null;
+      const row = { kind: f.get('kind'), service: f.get('service'), body, contact: String(f.get('contact')).trim() || null, occurred, photos: paths, page: location.href.slice(0, 300) };
       must(await c.from('inquiries').insert(row));
       track('inquiry_submit', { kind: row.kind, service: row.service, photos: paths.length });
       reset();
-      say('보냈어요. 확인하고 연락드릴게요!');
+      say('');
+      pop.hidePopover();
+      alert('보냈어요. 확인하고 연락드릴게요!');
     } catch (err) {
       console.error('inquiry submit failed', err);
       say('보내지 못했어요. 잠시 뒤 다시 시도해 주세요.', true);
