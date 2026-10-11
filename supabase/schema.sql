@@ -67,6 +67,7 @@ create table public.inquiries (
   body text not null check (char_length(body) between 1 and 2000),
   photos text[] not null default '{}' check (cardinality(photos) <= 2), -- inquiries 버킷 안 경로
   contact text check (char_length(contact) <= 100),
+  occurred text check (char_length(occurred) <= 100), -- 문제가 생긴 시간. 사용자가 대략 적는 자유 문구
   page text check (char_length(page) <= 300),
   created_at timestamptz not null default now()
 );

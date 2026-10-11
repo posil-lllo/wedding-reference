@@ -61,8 +61,9 @@
     <fieldset><legend>문의 종류</legend><div class="inq-chips">${chips('kind', KINDS)}</div></fieldset>
     <fieldset><legend>대상 서비스</legend><div class="inq-chips">${chips('service', SERVICES, location.pathname.includes('/mbti/') ? 'mbti' : 'reference')}</div></fieldset>
     <label><span class="inq-label">내용</span><textarea name="body" maxlength="2000" required placeholder="어떤 화면에서 무엇을 하다가 생긴 일인지 적어 주시면 빨리 찾을 수 있어요."></textarea></label>
+    <label><span class="inq-label">문제가 생긴 시간 <small>(선택)</small></span><input type="text" name="occurred" maxlength="100" placeholder="예: 오늘 오후 3시쯤"></label>
     <div><span class="inq-label">참고 사진 <small>(${MAX_PHOTOS}장까지)</small></span><div class="inq-photos"></div></div>
-    <label><span class="inq-label">안내받을 연락처 또는 메일 <small>(선택)</small></span><input type="text" name="contact" maxlength="100" autocomplete="email" placeholder="010-0000-0000 또는 name@example.com"></label>
+    <label><span class="inq-label">안내받을 연락처 또는 메일 <small>(선택)</small></span><input type="text" name="contact" maxlength="100" autocomplete="email" placeholder="입력"></label>
     <p class="inq-msg" role="status"></p>
     <div class="inq-btns"><button type="button" class="soft" data-close>닫기</button><button type="submit">보내기</button></div>
   </form>`;
@@ -171,7 +172,7 @@
         must(await c.storage.from(BUCKET).upload(path, p.blob, { contentType: 'image/jpeg' }));
         return path;
       }));
-      const row = { kind: f.get('kind'), service: f.get('service'), body, contact: String(f.get('contact')).trim() || null, photos: paths, page: location.href.slice(0, 300) };
+      const row = { kind: f.get('kind'), service: f.get('service'), body, contact: String(f.get('contact')).trim() || null, occurred: String(f.get('occurred')).trim() || null, photos: paths, page: location.href.slice(0, 300) };
       must(await c.from('inquiries').insert(row));
       track('inquiry_submit', { kind: row.kind, service: row.service, photos: paths.length });
       reset();
