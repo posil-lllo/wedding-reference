@@ -101,9 +101,15 @@ let profile = null; // profiles 테이블의 내 행 { nickname, role, character
 let draftId = null;
 // syncedAt: 이 브라우저가 마지막으로 불러오거나 저장한 서버 시각. 서버 값과 다르면 다른 창·기기가 그 뒤에 저장한 것
 let syncedAt = 0;
-const setDraftId = (id, at = 0) => {
+// 에디터 맨 위 제목 (로그인해서 시안에 저장 중일 때만 보임)
+const renderDraftName = (name) => {
+  document.getElementById('ed-name').textContent = name;
+  document.getElementById('ed-title').hidden = !(user && draftId && name);
+};
+const setDraftId = (id, at = 0, name = '') => {
   draftId = id;
   syncedAt = at;
+  renderDraftName(name);
   if (id) {
     localStorage.setItem('wr-draft', id);
     localStorage.setItem('wr-synced', String(at));
@@ -133,7 +139,7 @@ async function syncOnce(s) {
   const isAutoName = !prev || prev.name === defaultName(prev.data);
   const d = { id: draftId, name: isAutoName ? defaultName(s) : prev.name, updatedAt: Date.now(), data: s };
   await backend.put(user.id, d);
-  setDraftId(d.id, d.updatedAt);
+  setDraftId(d.id, d.updatedAt, d.name);
 }
 
 // 시안이 이미 MAX_DRAFTS 개면 안내만 하고 false (서버 트리거도 같은 제한)
@@ -144,7 +150,7 @@ async function createDraft(s) {
   }
   const d = { id: uid(), name: defaultName(s), updatedAt: Date.now(), data: s };
   await backend.put(user.id, d);
-  setDraftId(d.id, d.updatedAt);
+  setDraftId(d.id, d.updatedAt, d.name);
   return true;
 }
 
@@ -176,13 +182,16 @@ function renderAuth() {
 
 const fmtSaved = (t) => new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
+const KEBAB = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5.5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="18.5" r="1.6"/></svg>';
+
 // 대표 이미지: 시안에 첨부한 사진 중 처음 나오는 것
 const draftCard = (d, img) => {
   const isCur = d.id === draftId;
   return `<article class="dcard${isCur ? ' cur' : ''}">
     <button class="dcard-img" data-open="${esc(d.id)}" aria-label="${esc(d.name)} 이어서 작업">${img ? `<img src="${esc(img)}" alt="">` : '<span>사진 없음</span>'}${isCur ? '<em>작업 중</em>' : ''}</button>
-    <input class="dcard-name" value="${esc(d.name)}" data-rename="${esc(d.id)}" maxlength="40" aria-label="시안 이름">
-    <div class="dcard-f"><small>${fmtSaved(d.updatedAt)}</small>${isCur ? '' : `<button class="del" data-rm="${esc(d.id)}" aria-label="삭제">✕</button>`}</div>
+    <p class="dcard-name">${esc(d.name)}</p>
+    <div class="dcard-f"><small>${fmtSaved(d.updatedAt)}</small><button class="iconbtn" popovertarget="dm-${esc(d.id)}" aria-label="시안 메뉴">${KEBAB}</button></div>
+    <nav class="help my-menu" id="dm-${esc(d.id)}" popover aria-label="시안 메뉴"><button data-rename="${esc(d.id)}">이름 수정</button>${isCur ? '' : `<button data-rm="${esc(d.id)}">시안 삭제</button>`}</nav>
   </article>`;
 };
 
@@ -236,17 +245,19 @@ async function login() {
 async function openDraft(d, view = 'edit') {
   setStatus('시안 불러오는 중…');
   const data = await toLocal(d.data);
-  setDraftId(d.id, d.updatedAt);
+  setDraftId(d.id, d.updatedAt, d.name);
   loadIntoEditor(data, view);
 }
 
 // 메뉴를 여는 아이콘 바로 아래, 오른쪽 끝을 맞춰 드롭다운처럼
-document.querySelectorAll('.my-menu').forEach((menu) => menu.addEventListener('beforetoggle', (e) => {
-  if (e.newState !== 'open') return;
+// 마이페이지 시안 카드 메뉴는 나중에 그려지므로 document 에서 capture 로 받음 (beforetoggle 은 버블링되지 않음)
+document.addEventListener('beforetoggle', (e) => {
+  const menu = e.target;
+  if (e.newState !== 'open' || !menu.classList?.contains('my-menu')) return;
   const r = document.querySelector(`[popovertarget="${menu.id}"]`).getBoundingClientRect();
   menu.style.top = `${r.bottom + 6}px`;
   menu.style.right = `${Math.max(8, innerWidth - r.right)}px`;
-}));
+}, true);
 document.addEventListener('click', (e) => {
   const t = e.target;
   if (t.closest('.my-menu button')) t.closest('.my-menu').hidePopover();
@@ -254,19 +265,30 @@ document.addEventListener('click', (e) => {
   else if (t.closest('[data-save-draft]')) saveDraft(true);
   else if (t.closest('[data-new-draft]')) newDraft();
   else if (t.closest('[data-logout]')) logout();
+  else if (t.closest('[data-rename-cur]')) renameDraft(draftId);
   else if (t.closest('[data-edit]')) openProfile(t.closest('[data-edit]').dataset.edit);
   else if (t.closest('[data-skip-ask]')) localStorage.setItem(SKIP_DAY, new Date().toDateString()); // 닫기는 popovertarget 이 함
   // 메뉴를 닫은 뒤 상담원 아이콘과 같은 문의 창을 띄움
   else if (t.closest('[data-fb]')) document.getElementById('fb').showPopover();
 });
 
-draftsEl.addEventListener('change', async (e) => {
-  const id = e.target.dataset.rename;
-  if (!id) return;
-  const d = await backend.get(user.id, id);
-  await backend.put(user.id, { ...d, name: e.target.value.trim() || defaultName(d.data) });
-  track('rename_draft');
-});
+// 이름 바꾸기: 에디터 제목의 수정 버튼, 마이페이지 시안 메뉴의 이름 수정. 비우면 신랑·신부 이름을 따르는 자동 이름으로
+async function renameDraft(id) {
+  try {
+    const d = await backend.get(user.id, id);
+    const input = prompt('시안 이름 (40자까지)', d.name);
+    if (input === null) return false;
+    const name = input.trim().slice(0, 40) || defaultName(d.data);
+    await backend.put(user.id, { ...d, name });
+    if (id === draftId) renderDraftName(name);
+    track('rename_draft');
+    return true;
+  } catch (err) {
+    console.error('rename draft failed', err);
+    alert('이름을 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+    return false;
+  }
+}
 draftsEl.addEventListener('click', async (e) => {
   const b = e.target.closest('button');
   if (!b) return;
@@ -281,8 +303,10 @@ draftsEl.addEventListener('click', async (e) => {
       console.error('open draft failed', err);
       setStatus('시안을 불러오지 못했어요', true);
     }
+  } else if (b.dataset.rename) {
+    if (await renameDraft(b.dataset.rename)) await renderMyPage();
   } else if (b.dataset.rm) {
-    if (!confirm('이 시안을 삭제할까요?')) return;
+    if (!confirm('이 시안을 삭제할까요?\n삭제하면 되돌릴 수 없어요.')) return;
     try {
       await backend.remove(user.id, b.dataset.rm);
       track('delete_draft');
@@ -455,6 +479,7 @@ profileForm.addEventListener('submit', async (e) => {
       // 다른 창·기기에서 이 시안을 더 저장했으면 그 내용으로 바꿔 둠
       const d = await backend.get(user.id, draftId);
       if (d && d.updatedAt !== syncedAt) await openDraft(d, null);
+      else if (d) renderDraftName(d.name);
       setStatus('');
     }
   } catch (e) {

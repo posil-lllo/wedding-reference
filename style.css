@@ -322,6 +322,9 @@ button.brand { border: 0; background: none; padding: 0; cursor: pointer; text-al
 .dcard-img { position: relative; aspect-ratio: 3 / 4; padding: 0; border: 0; border-radius: 6px; overflow: hidden; background: var(--ivory); color: var(--muted); font-size: 12px; cursor: pointer; }
 .dcard-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .dcard-img em { position: absolute; top: 8px; left: 8px; padding: 2px 8px; border-radius: 999px; background: var(--accent-text); color: #fff; font: 500 11px var(--sans); }
-.dcard-name { border: 1px solid transparent; border-radius: 4px; background: none; padding: 2px 4px; font: 700 14px var(--serif); color: var(--ink); min-width: 0; }
-.dcard-name:hover, .dcard-name:focus { border-color: var(--line); background: #fff; }
-.dcard-f { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; color: var(--muted); font-size: 11px; }
+.dcard-name { margin: 0; padding: 2px 4px; font: 700 14px var(--serif); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dcard-f { display: flex; justify-content: space-between; align-items: center; padding: 0 0 0 4px; color: var(--muted); font-size: 11px; }
+.dcard-f .iconbtn { width: 28px; height: 28px; }
+.ed-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.ed-title h1 { margin: 0; font: 700 20px var(--serif); color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ed-title .btn.pill { flex: none; }
