@@ -56,3 +56,28 @@ create unique index profiles_nickname_key on public.profiles (lower(nickname));
 alter table public.profiles
   add column wedding_date date,
   add column wedding_date_range smallint check (wedding_date_range in (0, 1, 3));
+
+-- 문의하기(inquiry.js): 로그인 없이도 넣을 수만 있고 읽기·수정은 막힘. 확인은 대시보드(Table Editor)에서
+-- kind: error 에러 / improve 개선 요청 / feedback 피드백 / etc 기타, service: mbti 성향 테스트 / reference 시안 만들기
+create table public.inquiries (
+  id bigint generated always as identity primary key,
+  user_id uuid default auth.uid() references auth.users on delete set null,
+  kind text not null check (kind in ('error', 'improve', 'feedback', 'etc')),
+  service text not null check (service in ('mbti', 'reference')),
+  body text not null check (char_length(body) between 1 and 2000),
+  photos text[] not null default '{}' check (cardinality(photos) <= 2), -- inquiries 버킷 안 경로
+  contact text check (char_length(contact) <= 100),
+  page text check (char_length(page) <= 300),
+  created_at timestamptz not null default now()
+);
+alter table public.inquiries enable row level security;
+create policy "anyone submits" on public.inquiries for insert to anon, authenticated
+  with check (user_id is null or user_id = auth.uid());
+revoke all on public.inquiries from anon, authenticated;
+grant insert on public.inquiries to anon, authenticated;
+
+-- 문의 참고 사진: 비공개 버킷, 올리기만 됨. 브라우저에서 긴 변 1600px JPEG 로 줄여 올리므로 2MB 면 충분
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('inquiries', 'inquiries', false, 2097152, array['image/jpeg']);
+create policy "anyone uploads inquiry photos" on storage.objects for insert to anon, authenticated
+  with check (bucket_id = 'inquiries');

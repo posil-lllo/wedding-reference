@@ -690,8 +690,3 @@ const ready = (async () => {
   renderEditor();
   if (viewFromHash() !== 'my') renderView(viewFromHash()); // 마이페이지는 로그인 확인 뒤 account.js 가 띄움
 })();
-
-document.getElementById('fb-go').addEventListener('click', () => {
-  document.getElementById('fb').hidePopover();
-  track('feedback_click');
-});

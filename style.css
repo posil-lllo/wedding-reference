@@ -184,7 +184,6 @@ textarea.in { min-height: 64px; resize: vertical; }
 .crop-btns { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .crop-btns .btn { padding: 5px 14px; font-size: 13px; }
 .fb-btns { margin-top: 14px; }
-.fb-btns a.btn { text-decoration: none; }
 .btn.soft { border-color: #f1f0ec; background: #f1f0ec; color: var(--ink); }
 .add-img input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .add-img:has(input:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: 2px; }
