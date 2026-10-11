@@ -45,10 +45,7 @@
     <button class="iconbtn" popovertarget="toc" aria-label="목차"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r=".8"/><circle cx="4.5" cy="12" r=".8"/><circle cx="4.5" cy="18" r=".8"/></svg></button>
     <nav class="help toc" id="toc" popover aria-label="목차"></nav>
     <button class="iconbtn" popovertarget="fb" aria-label="문의·피드백" title="문의·피드백"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 14v-2a7.5 7.5 0 0 1 15 0v2"/><rect x="3.5" y="13" width="4" height="5.5" rx="1.6"/><rect x="16.5" y="13" width="4" height="5.5" rx="1.6"/><path d="M18.5 18.5v.5a2.5 2.5 0 0 1-2.5 2.5h-2.5"/></svg></button>
-    <div class="help" id="fb" popover role="dialog" aria-label="문의·피드백">
-      <p>문의나 피드백이 있다면, 구글폼에 남겨주세요.<br>확인하고 연락드리겠습니다!</p>
-      <div class="crop-btns fb-btns"><button class="btn soft" popovertarget="fb" popovertargetaction="hide">취소</button><a class="btn" id="fb-go" href="https://forms.gle/s7zKCAUqwVrtCPg47" target="_blank" rel="noopener">문의 남기기</a></div>
-    </div>
+    <div id="fb" popover role="dialog" aria-label="문의하기"></div><!-- 폼은 inquiry.js 가 그림 -->
     <button class="kakao" id="login-top" data-login><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="#000" d="M12 3C6.48 3 2 6.48 2 10.78c0 2.78 1.86 5.22 4.66 6.6l-.95 3.5c-.08.3.26.55.52.38l4.13-2.73c.54.07 1.08.1 1.64.1 5.52 0 10-3.48 10-7.85S17.52 3 12 3z"/></svg><span><span class="full">카카오 </span>로그인</span></button>
     <button class="iconbtn" id="my-btn" popovertarget="my-menu" aria-label="마이페이지" title="마이페이지" hidden><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg></button>
     <div class="help" id="login-ask" popover role="dialog" aria-label="로그인 안내">
@@ -137,5 +134,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="datepick.js"></script>
 <script src="account.js"></script>
+  <script src="inquiry.js"></script>
 </body>
 </html>
