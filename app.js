@@ -578,11 +578,12 @@ pointHex.addEventListener('blur', () => {
 // ── 탭 · 결과 ──
 const deckEl = document.getElementById('deck');
 // 화면마다 주소(#/edit 등)를 달리 둬서 새로고침·뒤로 가기에도 그 화면이 유지됨
-const VIEWS = ['home', 'edit', 'view', 'my'];
-// 성향 테스트는 mbti/ 로 옮김. 예전 #/mbti 주소로 들어오면 넘겨 줌
-if (location.hash === '#/mbti') location.replace('mbti/');
+const VIEWS = ['home', 'edit', 'view', 'my', 'shared', 'test', 'chars'];
+const LOGIN_VIEWS = ['my', 'shared']; // 로그인해야 보이는 화면. 로그인 확인 뒤 account.js 가 띄움
+// 예전 성향 테스트 주소(#/mbti)로 들어오면 #/test 로
+if (location.hash === '#/mbti') history.replaceState(null, '', '#/test');
 const viewFromHash = () => {
-  const v = location.hash.slice(2);
+  const v = location.hash.slice(2).split('?')[0]; // #/chars?c=..&g=.. 처럼 뒤에 값이 붙을 수 있음
   return VIEWS.includes(v) ? v : 'home';
 };
 const urlOf = (view) => (view === 'home' ? location.pathname + location.search : `#/${view}`);
@@ -596,12 +597,15 @@ function renderView(view) {
   document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.view === view)));
   if (view === 'view') deckEl.innerHTML = renderDeck(withoutBlanks(state));
   if (view === 'my') renderMyPage(); // account.js
+  if (view === 'shared') renderShared(); // account.js
+  if (view === 'home') window.renderHome?.(); // account.js. 처음 열 때는 아직 없을 수 있고, 그때는 account.js 가 로그인 확인 뒤 부름
+  if (view === 'chars') window.openSharedChar?.(); // mbti/chars.js
   if (view === 'edit') window.askLogin?.(); // account.js. 처음 열 때는 아직 안 불렸을 수 있고, 그때는 account.js 가 로그인 확인 뒤 부름
   scrollTo(0, 0);
 }
 addEventListener('popstate', () => {
   const v = viewFromHash();
-  if (v === 'my' && !user) { // 로그아웃 뒤 마이페이지로 돌아온 경우 (user 는 account.js)
+  if (LOGIN_VIEWS.includes(v) && !user) { // 로그아웃 뒤 마이페이지 등으로 돌아온 경우 (user 는 account.js)
     history.replaceState(null, '', urlOf('home'));
     return renderView('home');
   }
@@ -612,6 +616,7 @@ document.addEventListener('click', (e) => {
   if (!b) return;
   show(b.dataset.view);
   if (b.dataset.view === 'my') track('open_mypage');
+  if (b.dataset.view === 'shared') track('open_shared');
   if (b.dataset.view === 'view') track('view_result', { from: b.closest('.edit-bar') ? 'complete_button' : 'tab' });
 });
 
@@ -688,5 +693,5 @@ const ready = (async () => {
   }
   applyPointColor(state.pointColor);
   renderEditor();
-  if (viewFromHash() !== 'my') renderView(viewFromHash()); // 마이페이지는 로그인 확인 뒤 account.js 가 띄움
+  if (!LOGIN_VIEWS.includes(viewFromHash())) renderView(viewFromHash()); // 마이페이지 등은 로그인 확인 뒤 account.js 가 띄움
 })();

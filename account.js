@@ -41,7 +41,9 @@ async function upload(uid, url) {
 }
 const toRemote = (uid, data) => mapStrings(data, async (s) => {
   if (!s.startsWith('data:image')) return s;
-  if (!pathOf.has(s)) pathOf.set(s, upload(uid, s).catch((e) => { pathOf.delete(s); throw e; }));
+  // 남의 공유본에서 가져온 사진은 그 사람 폴더 경로가 캐시돼 있으므로 내 폴더로 다시 올림
+  const isMine = pathOf.has(s) && (await pathOf.get(s).catch(() => '')).startsWith(`${uid}/`);
+  if (!isMine) pathOf.set(s, upload(uid, s).catch((e) => { pathOf.delete(s); throw e; }));
   return `sb:${await pathOf.get(s)}`;
 });
 const toLocal = (data) => mapStrings(data, async (s) => {
@@ -82,14 +84,22 @@ const backend = {
   put: async (uid, d) => must(await sb.from('drafts').upsert({
     user_id: uid, id: d.id, name: d.name, updated_at: new Date(d.updatedAt).toISOString(), data: await toRemote(uid, d.data),
   })),
-  // 시안을 지우면 다른 시안에서 안 쓰는 사진도 같이 지움
+  // 시안을 지우면 다른 시안·공유본에서 안 쓰는 사진도 같이 지움 (지운 시안의 공유본은 DB 가 같이 지움)
   remove: async (uid, id) => {
-    const all = await backend.list();
+    const [all, shares] = await Promise.all([backend.list(), backend.shares()]);
     must(await sb.from('drafts').delete().eq('id', id));
-    const kept = new Set(all.filter((d) => d.id !== id).flatMap((d) => photoPaths(d.data)));
+    const kept = new Set([...all.filter((d) => d.id !== id), ...shares.filter((x) => x.draft_id !== id)].flatMap((d) => photoPaths(d.data)));
     const orphans = [...new Set(photoPaths(all.find((d) => d.id === id)?.data))].filter((p) => !kept.has(p));
     if (orphans.length) must(await sb.storage.from(BUCKET).remove(orphans));
   },
+  // 공유본(shares): 공유하기를 누른 순간의 시안. 신랑·신부 이름과 촬영일(basic)은 빼고 올림
+  shares: async () => must(await sb.from('shares').select('draft_id,shared_at,data')),
+  share: async (uid, d) => must(await sb.from('shares').upsert({
+    user_id: uid, draft_id: d.id, shared_at: new Date().toISOString(), data: (({ basic, ...rest }) => rest)(d.data),
+  })),
+  unshare: async (id) => must(await sb.from('shares').delete().eq('draft_id', id)),
+  // 남의 공유본. 내가 공유한 것이 없으면 서버가 'share required' 로 거부
+  sharedList: async () => must(await sb.rpc('shared_drafts')),
   // 마이페이지 카드용 1시간짜리 서명 URL
   signedUrls: async (paths) => (paths.length
     ? Object.fromEntries(must(await sb.storage.from(BUCKET).createSignedUrls(paths, 3600)).map((x) => [x.path, x.signedUrl]))
@@ -185,13 +195,16 @@ const fmtSaved = (t) => new Date(t).toLocaleString('ko-KR', { month: 'numeric', 
 const KEBAB = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5.5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="18.5" r="1.6"/></svg>';
 
 // 대표 이미지: 시안에 첨부한 사진 중 처음 나오는 것
-const draftCard = (d, img) => {
+const draftCard = (d, img, sharedAt) => {
   const isCur = d.id === draftId;
+  const shareBtns = sharedAt
+    ? `<button data-share="${esc(d.id)}">공유 다시 하기</button><button data-unshare="${esc(d.id)}">공유 내리기</button>`
+    : `<button data-share="${esc(d.id)}">공유하기</button>`;
   return `<article class="dcard${isCur ? ' cur' : ''}">
-    <button class="dcard-img" data-open="${esc(d.id)}" aria-label="${esc(d.name)} 이어서 작업">${img ? `<img src="${esc(img)}" alt="">` : '<span>사진 없음</span>'}${isCur ? '<em>작업 중</em>' : ''}</button>
+    <button class="dcard-img" data-open="${esc(d.id)}" aria-label="${esc(d.name)} 이어서 작업">${img ? `<img src="${esc(img)}" alt="">` : '<span>사진 없음</span>'}${isCur ? '<em>작업 중</em>' : ''}${sharedAt ? '<em class="shared">공유 중</em>' : ''}</button>
     <p class="dcard-name">${esc(d.name)}</p>
     <div class="dcard-f"><small>${fmtSaved(d.updatedAt)}</small><button class="iconbtn" popovertarget="dm-${esc(d.id)}" aria-label="시안 메뉴">${KEBAB}</button></div>
-    <nav class="help my-menu" id="dm-${esc(d.id)}" popover aria-label="시안 메뉴"><button data-rename="${esc(d.id)}">이름 수정</button>${isCur ? '' : `<button data-rm="${esc(d.id)}">시안 삭제</button>`}</nav>
+    <nav class="help my-menu" id="dm-${esc(d.id)}" popover aria-label="시안 메뉴"><button data-rename="${esc(d.id)}">이름 수정</button>${shareBtns}${isCur ? '' : `<button data-rm="${esc(d.id)}">시안 삭제</button>`}</nav>
   </article>`;
 };
 
@@ -202,12 +215,222 @@ const DEFAULT_AVATAR = `<svg class="avatar-def" viewBox="0 0 100 100" aria-hidde
 
 // app.js 의 show('my') 가 부름
 async function renderMyPage() {
-  const list = await backend.list();
+  const [list, shares] = await Promise.all([backend.list(), backend.shares()]);
+  const sharedAt = Object.fromEntries(shares.map((x) => [x.draft_id, x.shared_at]));
   const covers = await backend.signedUrls([...new Set(list.map((d) => photoPaths(d.data)[0]).filter(Boolean))]);
   document.getElementById('my-avatar').innerHTML = user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : DEFAULT_AVATAR;
   showProfile();
-  draftsEl.innerHTML = list.map((d) => draftCard(d, covers[photoPaths(d.data)[0]])).join('') || '<p class="note">저장된 시안이 없어요</p>';
+  draftsEl.innerHTML = list.map((d) => draftCard(d, covers[photoPaths(d.data)[0]], sharedAt[d.id])).join('') || '<p class="note">저장된 시안이 없어요</p>';
 }
+
+// ── 레퍼런스 공유 ──
+// 공유본은 공유하기를 누른 순간의 시안. 사진이 SHARE_MIN_PHOTOS 장 이상이어야 공유되고, 공유한 사람만 남의 공유본을 봄
+// 서버(schema.sql share_data_ok)도 같은 기준으로 막음. 바꾸면 둘 다 바꿀 것
+const SHARE_MIN_PHOTOS = 10;
+const countPhotos = (data) => new Set(photoPaths(data)).size;
+
+async function shareDraft(id) {
+  try {
+    // 작업 중인 시안이면 화면 내용부터 저장해야 방금 넣은 사진까지 공유됨
+    if (id === draftId && !(await saveDraft())) return;
+    const d = await backend.get(user.id, id);
+    const n = countPhotos((({ basic, ...rest }) => rest)(d.data));
+    if (n < SHARE_MIN_PHOTOS) {
+      alert(`사진이 ${SHARE_MIN_PHOTOS}장 이상 담긴 시안만 공유할 수 있어요.\n지금 ${n}장이에요. ${SHARE_MIN_PHOTOS - n}장 더 넣어 주세요.`);
+      return;
+    }
+    if (!confirm('지금 내용 그대로 공유할까요?\n신랑·신부 이름과 촬영일은 빼고 공유돼요. 이후에 고친 내용은 \'공유 다시 하기\'를 눌러야 반영돼요.')) return;
+    await backend.share(user.id, d);
+    track('share_draft', { photos: n });
+    alert('공유했어요. 이제 다른 분들이 공유한 레퍼런스도 볼 수 있어요.');
+  } catch (err) {
+    console.error('share draft failed', err);
+    alert('공유하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+  }
+}
+async function unshareDraft(id) {
+  const isLast = (await backend.shares()).length === 1;
+  if (!confirm(isLast ? '공유를 내릴까요?\n공유한 시안이 하나도 없으면 다른 분들의 레퍼런스도 볼 수 없어요.' : '공유를 내릴까요?')) return;
+  try {
+    await backend.unshare(id);
+    track('unshare_draft');
+  } catch (err) {
+    console.error('unshare draft failed', err);
+    alert('공유를 내리지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+  }
+}
+
+// 공유 레퍼런스 화면: 목록 → 카드를 누르면 미리보기 → 내 시안으로 가져가기
+const sharedEl = document.getElementById('shared');
+const sharedPreview = document.getElementById('shared-preview');
+let sharedItems = [];
+let picked = null; // 미리보기 중인 공유본 { item, data(사진을 받은 data URL 판) }
+
+const sharedCard = (x, i, img) => `<article class="dcard">
+    <button class="dcard-img" data-pick="${i}" aria-label="${esc(x.nickname || '익명')}님 레퍼런스 보기">${img ? `<img src="${esc(img)}" alt="">` : '<span>사진 없음</span>'}</button>
+    <p class="dcard-name">${esc(x.nickname || '익명')}님의 레퍼런스</p>
+    <div class="dcard-f"><small>사진 ${countPhotos(x.data)}장 · ${fmtSaved(Date.parse(x.shared_at))} 공유</small></div>
+  </article>`;
+
+// app.js 의 show('shared') 가 부름
+async function renderShared() {
+  picked = null;
+  sharedPreview.hidden = true;
+  sharedEl.hidden = false;
+  sharedEl.innerHTML = '<p class="note">불러오는 중…</p>';
+  try {
+    sharedItems = await backend.sharedList();
+  } catch (err) {
+    sharedItems = [];
+    if (/share required/.test(err.message)) {
+      sharedEl.innerHTML = `<div class="share-lock"><p>사진이 ${SHARE_MIN_PHOTOS}장 이상 담긴 내 시안을 공유하면<br>다른 분들이 공유한 레퍼런스를 볼 수 있어요.</p><button class="btn" data-view="my">마이페이지에서 공유하기</button></div>`;
+      return;
+    }
+    console.error('shared list failed', err);
+    sharedEl.innerHTML = '<p class="note">불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.</p>';
+    return;
+  }
+  const covers = await backend.signedUrls([...new Set(sharedItems.map((x) => photoPaths(x.data)[0]).filter(Boolean))]).catch(() => ({}));
+  sharedEl.innerHTML = sharedItems.map((x, i) => sharedCard(x, i, covers[photoPaths(x.data)[0]])).join('')
+    || '<p class="note">아직 다른 분이 공유한 레퍼런스가 없어요.</p>';
+  if (homePick) {
+    const i = sharedItems.findIndex((x) => `${x.user_id}/${x.draft_id}` === homePick);
+    homePick = null;
+    if (i >= 0) pickShared(i);
+  }
+}
+
+// 홈 피드. 공유 안 한 사람은 RLS 로 실제 목록을 못 받으므로 흐린 자리표시 타일 위에 안내를 띄움
+const homeGrid = document.getElementById('home-grid');
+const homeLock = document.getElementById('home-lock');
+const HOME_FAKE_TILES = 10;
+let homePick = null; // 홈에서 고른 공유본. renderShared 가 목록을 받은 뒤 열어 줌
+const homeTile = (x, img) => `<button class="home-tile" data-home-pick="${esc(x.user_id)}/${esc(x.draft_id)}" aria-label="${esc(x.nickname || '익명')}님 시안 보기">
+    <span class="home-img">${img ? `<img src="${esc(img)}" alt="">` : ''}</span>
+    <small>${esc(x.nickname || '익명')} · 사진 ${countPhotos(x.data)}장</small>
+  </button>`;
+const LOCK_ICON = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+
+// 잠김 상태는 첫 줄만 선명하게. 열 수는 화면 폭에 따라 달라서 그리드 크기가 바뀔 때마다 다시 셈
+const blurBelowFirstRow = () => {
+  const cols = getComputedStyle(homeGrid).gridTemplateColumns.split(' ').length;
+  const locked = homeGrid.classList.contains('locked');
+  [...homeGrid.children].forEach((t, i) => t.classList.toggle('blur', locked && i >= cols));
+};
+new ResizeObserver(blurBelowFirstRow).observe(homeGrid);
+
+function lockHome(body) {
+  homeGrid.classList.add('locked');
+  homeGrid.innerHTML = Array.from({ length: HOME_FAKE_TILES }, (_, i) => `<div class="home-tile" aria-hidden="true"><span class="home-img c${i % 5}"></span><small>&nbsp;</small></div>`).join('');
+  blurBelowFirstRow();
+  homeLock.innerHTML = body && `<div class="home-pop">${LOCK_ICON}${body}</div>`;
+  homeLock.hidden = !body;
+}
+
+// 분류 칩: 그 분류에 사진이 있는 공유본만, 표지도 그 분류의 첫 사진으로
+let homeItems = [];
+let homeCat = '';
+async function paintHome() {
+  const pick = (x) => photoPaths(homeCat ? x.data?.[homeCat] : x.data)[0];
+  const list = homeItems.filter((x) => !homeCat || pick(x));
+  const covers = await backend.signedUrls([...new Set(list.map(pick).filter(Boolean))]).catch(() => ({}));
+  homeGrid.innerHTML = list.map((x) => homeTile(x, covers[pick(x)])).join('')
+    || `<p class="note">${homeItems.length ? '이 분류에 사진이 있는 시안이 아직 없어요.' : '아직 다른 분이 공유한 시안이 없어요.'}</p>`;
+}
+document.getElementById('home-chips').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-cat]');
+  if (!b) return;
+  homeCat = b.dataset.cat;
+  for (const c of e.currentTarget.children) c.setAttribute('aria-pressed', c === b);
+  if (!homeGrid.classList.contains('locked')) paintHome();
+});
+
+async function renderHome() {
+  if (!authChecked) return lockHome(''); // 로그인 확인 전엔 안내 없이 자리만
+  if (!user) {
+    return lockHome(`<strong>다른 커플의 시안을 보려면</strong><p>카카오로 로그인하고 사진 ${SHARE_MIN_PHOTOS}장 이상 담긴 내 시안을 공유하면 모두 볼 수 있어요.</p><button class="btn" data-login>카카오로 시작하기</button>`);
+  }
+  let items;
+  try {
+    items = await backend.sharedList();
+  } catch (err) {
+    if (!/share required/.test(err.message)) {
+      console.error('home shared list failed', err);
+      return lockHome('<strong>불러오지 못했어요</strong><p>잠시 뒤 다시 시도해 주세요.</p>');
+    }
+    const n = countPhotos((({ basic, ...rest }) => rest)(state));
+    const left = SHARE_MIN_PHOTOS - n;
+    return lockHome(`<strong>내 시안을 공유하면 열려요</strong>
+      <p>사진 ${SHARE_MIN_PHOTOS}장 이상 담긴 시안을 하나 공유하면 다른 커플이 공유한 시안을 모두 볼 수 있어요.</p>
+      <div class="home-meter"><div class="home-progress"><span style="width:${Math.min(100, (n / SHARE_MIN_PHOTOS) * 100)}%"></span></div>
+      <small>지금 시안 사진 ${Math.min(n, SHARE_MIN_PHOTOS)} / ${SHARE_MIN_PHOTOS}장</small></div>
+      ${left > 0 ? `<button class="btn" data-view="edit">사진 ${left}장 더 채우기</button>` : '<button class="btn" data-view="my">마이페이지에서 공유하기</button>'}`);
+  }
+  homeGrid.classList.remove('locked');
+  homeLock.hidden = true;
+  homeItems = items;
+  await paintHome();
+}
+
+homeGrid.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-home-pick]');
+  if (!b) return;
+  homePick = b.dataset.homePick;
+  show('shared');
+});
+
+async function pickShared(i) {
+  const item = sharedItems[i];
+  setStatus('레퍼런스 불러오는 중…');
+  try {
+    const data = await toLocal(item.data);
+    picked = { item, data };
+    document.getElementById('shared-who').textContent = `${item.nickname || '익명'}님의 레퍼런스`;
+    document.getElementById('shared-deck').innerHTML = renderDeck(withoutBlanks(restore(data)));
+    sharedEl.hidden = true;
+    sharedPreview.hidden = false;
+    scrollTo(0, 0);
+    setStatus('');
+    track('view_shared');
+  } catch (err) {
+    console.error('open shared failed', err);
+    setStatus('레퍼런스를 불러오지 못했어요', true);
+  }
+}
+
+// 가져가기: 내 새 시안으로 통째로 복사. 사진은 toRemote 가 내 폴더로 다시 올림
+async function importShared() {
+  if (!picked) return;
+  if (!confirm('이 레퍼런스를 내 새 시안으로 가져올까요?\n가져온 시안은 자유롭게 고칠 수 있고, 원래 레퍼런스에는 영향이 없어요.')) return;
+  const btn = document.getElementById('shared-import');
+  btn.disabled = true;
+  setStatus('가져오는 중…');
+  try {
+    // 지금 작업 중인 시안의 바뀐 내용부터 저장
+    if (draftId && saveTimer && !(await saveDraft())) return;
+    const data = restore(picked.data);
+    if (!(await createDraft(data))) return setStatus('');
+    loadIntoEditor(data);
+    track('import_shared');
+  } catch (err) {
+    console.error('import shared failed', err);
+    setStatus('');
+    alert('가져오지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+sharedEl.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-pick]');
+  if (b) pickShared(Number(b.dataset.pick));
+});
+document.getElementById('shared-back').addEventListener('click', () => {
+  picked = null;
+  sharedPreview.hidden = true;
+  sharedEl.hidden = false;
+});
+document.getElementById('shared-import').addEventListener('click', importShared);
 
 // 비로그인으로 시안 화면에 처음 들어오면 탭마다 한 번 로그인 권유. 로그인 상태를 확인하기 전이면 확인한 뒤에 띄움
 let authChecked = false;
@@ -256,7 +479,8 @@ document.addEventListener('beforetoggle', (e) => {
   if (e.newState !== 'open' || !menu.classList?.contains('my-menu')) return;
   const r = document.querySelector(`[popovertarget="${menu.id}"]`).getBoundingClientRect();
   menu.style.top = `${r.bottom + 6}px`;
-  menu.style.right = `${Math.max(8, innerWidth - r.right)}px`;
+  if (menu.classList.contains('main-menu')) menu.style.left = `${Math.max(8, r.left)}px`; // 왼쪽 햄버거 메뉴
+  else menu.style.right = `${Math.max(8, innerWidth - r.right)}px`;
 }, true);
 document.addEventListener('click', (e) => {
   const t = e.target;
@@ -305,8 +529,14 @@ draftsEl.addEventListener('click', async (e) => {
     }
   } else if (b.dataset.rename) {
     if (await renameDraft(b.dataset.rename)) await renderMyPage();
+  } else if (b.dataset.share) {
+    await shareDraft(b.dataset.share);
+    await renderMyPage();
+  } else if (b.dataset.unshare) {
+    await unshareDraft(b.dataset.unshare);
+    await renderMyPage();
   } else if (b.dataset.rm) {
-    if (!confirm('이 시안을 삭제할까요?\n삭제하면 되돌릴 수 없어요.')) return;
+    if (!confirm('이 시안을 삭제할까요?\n삭제하면 되돌릴 수 없고, 공유한 시안이면 공유도 함께 내려가요.')) return;
     try {
       await backend.remove(user.id, b.dataset.rm);
       track('delete_draft');
@@ -467,8 +697,8 @@ profileForm.addEventListener('submit', async (e) => {
     draftId = user && localStorage.getItem('wr-draft');
     syncedAt = Number(localStorage.getItem('wr-synced')) || 0;
     renderAuth();
-    if (viewFromHash() === 'my') {
-      if (user) renderView('my');
+    if (LOGIN_VIEWS.includes(viewFromHash())) {
+      if (user) renderView(viewFromHash());
       else history.replaceState(null, '', urlOf('home'));
     }
     if (user && sessionStorage.getItem(LOGIN_FLAG)) {
@@ -489,6 +719,7 @@ profileForm.addEventListener('submit', async (e) => {
   // 로그인 직후에만, 닉네임·신랑신부가 비어 있으면 입력 창. 실패해도 다른 기능은 그대로 씀
   if (user) ensureProfile(justLoggedIn).catch((e) => console.error('profile load failed', e));
   authChecked = true;
+  if (viewFromHash() === 'home') renderHome();
   if (viewFromHash() === 'edit') askLogin();
 })();
 renderAuth();

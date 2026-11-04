@@ -1,3 +1,5 @@
+// 홈(index.html) SPA 의 #/test 화면. 홈 스크립트와 이름(show, track, restore 등)이 겹치지 않게 함수로 감쌈
+(() => {
 const QUESTIONS = [...VALUE_QUESTIONS, ...STYLE_QUESTIONS];
 const $ = (id) => document.getElementById(id);
 const track = (name, params = {}) => window.gtag?.("event", name, params);
@@ -7,7 +9,7 @@ let answers = [];
 let resultKey = null;
 
 function show(id) {
-  for (const s of document.querySelectorAll(".screen")) s.hidden = s.id !== id;
+  for (const s of document.querySelectorAll("#view-test .screen")) s.hidden = s.id !== id;
   window.scrollTo(0, 0);
 }
 
@@ -78,7 +80,7 @@ function renderResult() {
   img.hidden = !c.image;
   img.onerror = () => { img.hidden = true; };
   if (c.image) {
-    img.src = encodeURI(`서있는모습/${c.image}-${gender}.png`);
+    img.src = encodeURI(`mbti/서있는모습/${c.image}-${gender}.png`);
     img.alt = c.name;
   } else {
     img.removeAttribute("src");
@@ -173,14 +175,15 @@ $("share").hidden = !hasKakao;
 $("share").onclick = () => {
   const c = CHARACTERS[resultKey];
   track("mbti_share", { method: "kakao", character: c.name });
-  const home = new URL(".", location.href).href;
-  const detail = `${home}characters.html?c=${resultKey}&g=${encodeURIComponent(gender)}`;
+  const root = new URL(".", location.href).href;
+  const home = `${root}#/test`;
+  const detail = `${root}#/chars?c=${resultKey}&g=${encodeURIComponent(gender)}`;
   Kakao.Share.sendDefault({
     objectType: "feed",
     content: {
       title: `나의 결혼준비 유형은? ${c.name}`,
       description: c.line,
-      imageUrl: new URL(encodeURI(`서있는모습/${c.image}-${gender}.png`), location.href).href,
+      imageUrl: new URL(encodeURI(`mbti/서있는모습/${c.image}-${gender}.png`), location.href).href,
       link: { mobileWebUrl: detail, webUrl: detail },
     },
     buttons: [
@@ -201,3 +204,4 @@ $("story").onclick = async () => {
 };
 $("restart").onclick = () => { answers = []; clearSaved(); show("start"); };
 if (restore()) renderQuestion();
+})();
