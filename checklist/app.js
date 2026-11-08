@@ -61,6 +61,7 @@
   function store() {
     try {
       localStorage.setItem(KEY, JSON.stringify(state));
+      $('cl-err').hidden = true;
     } catch (e) {
       console.error('checklist save failed', e);
       $('cl-err').hidden = false;
@@ -220,7 +221,10 @@
     const li = act.closest('[data-cid]');
     const [it, c] = findCheck(li.dataset.cid);
     const k = act.dataset.ck;
-    if (k === 'rm') it.checks = it.checks.filter((x) => x !== c);
+    if (k === 'rm') {
+      if (!confirm(`'${c.text}' 할 일을 지울까요?`)) return;
+      it.checks = it.checks.filter((x) => x !== c);
+    }
     else {
       const isMemo = k === 'memo';
       const input = prompt(isMemo ? '메모 (200자까지, 비우면 지워요)' : '할 일 이름 (100자까지)', (isMemo ? c.memo : c.text) || '');

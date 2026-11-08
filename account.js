@@ -306,6 +306,7 @@ invitedEl.addEventListener('click', (e) => {
   }
 });
 document.getElementById('join-x').addEventListener('click', () => joinDlg.close());
+joinForm.addEventListener('input', () => { joinErr.hidden = true; }); // 비우고 내면 required 가 막아 submit 이 안 불리므로 고칠 때 지움
 joinForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const code = joinForm.code.value.trim().toUpperCase();
@@ -699,9 +700,9 @@ profileForm.addEventListener('submit', async (e) => {
     if (loginFrom) {
       sessionStorage.removeItem(LOGIN_FLAG);
       justLoggedIn = true;
-      const stay = loginFrom === 'checklist';
+      const stay = ['checklist', 'test'].includes(loginFrom); // 로그인을 누른 화면으로 돌아옴 (test 는 결과가 복원됨)
       await afterLogin(sessionStorage.getItem(KEEP_FLAG) || stay ? null : 'edit');
-      if (stay) show('checklist');
+      if (stay) show(loginFrom);
     } else if (user && draftId) {
       // 다른 창·기기에서 이 시안을 더 저장했으면 그 내용으로 바꿔 둠
       const d = await backend.get(user.id, draftId);

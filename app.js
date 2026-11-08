@@ -583,7 +583,8 @@ const deckEl = document.getElementById('deck');
 const VIEWS = ['home', 'edit', 'view', 'my', 'test', 'chars', 'invite', 'checklist'];
 const LOGIN_VIEWS = ['my']; // 로그인해야 보이는 화면. 로그인 확인 뒤 account.js 가 띄움
 // 예전 성향 테스트 주소(#/mbti)로 들어오면 #/test 로
-if (location.hash === '#/mbti') history.replaceState(null, '', '#/test');
+const fixOldHash = () => { if (location.hash === '#/mbti') history.replaceState(null, '', '#/test'); };
+fixOldHash();
 const viewFromHash = () => {
   const v = location.hash.slice(2).split('?')[0]; // #/chars?c=..&g=.. 처럼 뒤에 값이 붙을 수 있음
   return VIEWS.includes(v) ? v : 'home';
@@ -607,6 +608,7 @@ function renderView(view) {
   scrollTo(0, 0);
 }
 addEventListener('popstate', () => {
+  fixOldHash(); // 앱 안에서 주소를 #/mbti 로 바꾼 경우
   const v = viewFromHash();
   if (LOGIN_VIEWS.includes(v) && !user) { // 로그아웃 뒤 마이페이지 등으로 돌아온 경우 (user 는 account.js)
     history.replaceState(null, '', urlOf('home'));
