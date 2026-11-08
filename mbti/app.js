@@ -56,16 +56,29 @@ function renderQuestion() {
     // 문항끼리는 독립이라 답을 바꿔도 뒤 질문 답은 그대로 둔다.
     b.onclick = () => {
       ahead.shift();
-      answers.push(n);
-      // 새로고침으로 결과를 다시 볼 때는 세지 않도록 마지막 답을 고른 순간에만
-      if (answers.length === QUESTIONS.length) track("mbti_complete", { gender, character: CHARACTERS[decide().key].name });
-      renderQuestion();
+      answer(n);
     };
     return b;
   }));
   $("back").hidden = i === 0;
   $("next").hidden = ahead.length === 0;
   show("quiz");
+}
+
+// 답을 고르거나 "다음"으로 넘길 때 모두 여기로. 새로고침으로 결과를 다시 볼 때는 세지 않도록 마지막 답이 들어간 순간에만 완료 처리
+// 다 푼 결과 (저장용). "로그인하고 결과 보관하기"로 카카오에서 돌아왔을 때 account.js 도 부름
+window.testResult = () => answers.length === QUESTIONS.length
+  ? { ...decide(), gender, answers: answers.map((a, k) => ({ q: QUESTIONS[k].q, a: QUESTIONS[k].options[a].text, i: a })) }
+  : null;
+
+function answer(n) {
+  answers.push(n);
+  if (answers.length === QUESTIONS.length) {
+    const r = window.testResult();
+    track("mbti_complete", { gender, character: CHARACTERS[r.key].name });
+    window.saveTestResult?.(r);
+  }
+  renderQuestion();
 }
 
 const decide = () => decideCharacter(
@@ -166,7 +179,7 @@ for (const b of document.querySelectorAll("[data-gender]")) {
   b.onclick = () => { gender = b.dataset.gender; answers = []; ahead = []; track("mbti_start", { gender }); renderQuestion(); };
 }
 $("back").onclick = () => { ahead.unshift(answers.pop()); renderQuestion(); };
-$("next").onclick = () => { answers.push(ahead.shift()); renderQuestion(); };
+$("next").onclick = () => answer(ahead.shift());
 // 카카오 JavaScript 키는 등록한 도메인에서만 동작한다.
 const KAKAO_KEY = "eddcdfcb6c5ae4b85f18cec5e60f48c8";
 const hasKakao = typeof Kakao !== "undefined";

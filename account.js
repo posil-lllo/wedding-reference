@@ -8,6 +8,8 @@ const BUCKET = 'photos';
 const LOGIN_FLAG = 'wr-login';
 const ASKED_FLAG = 'wr-login-asked';
 const SKIP_DAY = 'wr-login-ask-skip'; // '오늘 하루 보지 않기' 누른 날짜
+const KEEP_FLAG = 'wr-keep-test'; // 테스트 결과 화면에서 로그인을 누른 경우, 돌아와서 그 결과를 저장
+const INVITE_FLAG = 'wr-invite'; // 초대 화면에서 로그인을 누른 경우, 카카오에서 돌아와 다시 열 초대 코드
 const MAX_DRAFTS = 2; // 서버 용량 때문에 계정당 시안 수 제한
 const must = ({ data, error }) => {
   if (error) throw error;
@@ -41,7 +43,7 @@ async function upload(uid, url) {
 }
 const toRemote = (uid, data) => mapStrings(data, async (s) => {
   if (!s.startsWith('data:image')) return s;
-  // 남의 공유본에서 가져온 사진은 그 사람 폴더 경로가 캐시돼 있으므로 내 폴더로 다시 올림
+  // 남의 시안(초대)에서 받은 사진은 그 사람 폴더 경로가 캐시돼 있으므로 내 폴더로 다시 올림
   const isMine = pathOf.has(s) && (await pathOf.get(s).catch(() => '')).startsWith(`${uid}/`);
   if (!isMine) pathOf.set(s, upload(uid, s).catch((e) => { pathOf.delete(s); throw e; }));
   return `sb:${await pathOf.get(s)}`;
@@ -58,9 +60,13 @@ const toLocal = (data) => mapStrings(data, async (s) => {
 });
 
 const COLS = 'id,name,updated_at,data';
+// 초대 코드 8자리. 헷갈리는 I O 0 1 을 뺀 32자 (schema.sql invites.code 검사와 같게)
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const newCode = () => [...crypto.getRandomValues(new Uint8Array(8))].map((b) => CODE_CHARS[b & 31]).join('');
 const fromRow = (r) => ({ id: r.id, name: r.name, updatedAt: Date.parse(r.updated_at), data: r.data });
+// 초대 링크로 들어와 익명 로그인한 사람은 로그인하지 않은 것으로 봄
 const toUser = (session) => {
-  if (!session) return null;
+  if (!session || session.user.is_anonymous) return null;
   const m = session.user.user_metadata || {};
   return { id: session.user.id, name: m.name || m.full_name || m.nickname || '이름 없음', avatar: m.avatar_url || m.picture };
 };
@@ -84,22 +90,31 @@ const backend = {
   put: async (uid, d) => must(await sb.from('drafts').upsert({
     user_id: uid, id: d.id, name: d.name, updated_at: new Date(d.updatedAt).toISOString(), data: await toRemote(uid, d.data),
   })),
-  // 시안을 지우면 다른 시안·공유본에서 안 쓰는 사진도 같이 지움 (지운 시안의 공유본은 DB 가 같이 지움)
+  // 시안을 지우면 다른 시안에서 안 쓰는 사진도 같이 지움
   remove: async (uid, id) => {
-    const [all, shares] = await Promise.all([backend.list(), backend.shares()]);
+    const all = await backend.list();
     must(await sb.from('drafts').delete().eq('id', id));
-    const kept = new Set([...all.filter((d) => d.id !== id), ...shares.filter((x) => x.draft_id !== id)].flatMap((d) => photoPaths(d.data)));
+    const kept = new Set(all.filter((d) => d.id !== id).flatMap((d) => photoPaths(d.data)));
     const orphans = [...new Set(photoPaths(all.find((d) => d.id === id)?.data))].filter((p) => !kept.has(p));
     if (orphans.length) must(await sb.storage.from(BUCKET).remove(orphans));
   },
-  // 공유본(shares): 공유하기를 누른 순간의 시안. 신랑·신부 이름과 촬영일(basic)은 빼고 올림
-  shares: async () => must(await sb.from('shares').select('draft_id,shared_at,data')),
-  share: async (uid, d) => must(await sb.from('shares').upsert({
-    user_id: uid, draft_id: d.id, shared_at: new Date().toISOString(), data: (({ basic, ...rest }) => rest)(d.data),
-  })),
-  unshare: async (id) => must(await sb.from('shares').delete().eq('draft_id', id)),
-  // 남의 공유본. 내가 공유한 것이 없으면 서버가 'share required' 로 거부
-  sharedList: async () => must(await sb.rpc('shared_drafts')),
+  // 초대: 시안 하나를 보기만 하게 링크·QR·코드로 보냄. 시안마다 하나, 끊고 다시 만들면 새 코드
+  invite: async (id) => must(await sb.from('invites').select('code').eq('draft_id', id).maybeSingle())?.code,
+  createInvite: async (uid, id) => must(await sb.from('invites').insert({ code: newCode(), user_id: uid, draft_id: id }).select('code').single()).code,
+  revokeInvite: async (id) => must(await sb.from('invites').delete().eq('draft_id', id)),
+  // 로그인하지 않았으면 익명 로그인부터. 그래야 서버가 이 사람에게 초대받은 시안의 사진을 열어 줌
+  joinInvite: async (code) => {
+    if (!must(await sb.auth.getSession()).session) must(await sb.auth.signInAnonymously());
+    return must(await sb.rpc('join_invite', { c: code }))[0];
+  },
+  invitedList: async () => must(await sb.rpc('invited_drafts')),
+  // 성향 테스트 결과는 한 번 할 때마다 쌓고, 최신 캐릭터는 프로필에도 적음 (프로필이 아직 없으면 update 는 아무 일 안 함)
+  saveTestResult: async (uid, r) => {
+    must(await sb.from('test_results').insert({
+      character: r.key, value: r.value, gender: r.gender, answers: r.answers, value_percent: r.valuePercent, style_percent: r.stylePercent,
+    }));
+    must(await sb.from('profiles').update({ character: r.key }).eq('user_id', uid));
+  },
   // 마이페이지 카드용 1시간짜리 서명 URL
   signedUrls: async (paths) => (paths.length
     ? Object.fromEntries(must(await sb.storage.from(BUCKET).createSignedUrls(paths, 3600)).map((x) => [x.path, x.signedUrl]))
@@ -107,6 +122,13 @@ const backend = {
 };
 
 let user = null;
+// mbti/app.js 가 테스트를 끝낸 순간 부름. 카카오 로그인한 사람만 저장 (익명·비로그인은 user 가 null)
+window.saveTestResult = (r) => {
+  if (!user) return;
+  backend.saveTestResult(user.id, r)
+    .then(() => { if (profile) profile = { ...profile, character: r.key }; })
+    .catch((e) => console.error('성향 테스트 결과 저장 실패', e));
+};
 let profile = null; // profiles 테이블의 내 행 { nickname, role, character }
 let draftId = null;
 // syncedAt: 이 브라우저가 마지막으로 불러오거나 저장한 서버 시각. 서버 값과 다르면 다른 창·기기가 그 뒤에 저장한 것
@@ -186,6 +208,7 @@ const draftsEl = document.getElementById('drafts');
 function renderAuth() {
   loginTop.hidden = Boolean(user);
   loginCta.hidden = Boolean(user);
+  document.getElementById('keep-result').hidden = Boolean(user);
   myBtn.hidden = !user;
   document.body.classList.toggle('authed', Boolean(user));
 }
@@ -195,16 +218,13 @@ const fmtSaved = (t) => new Date(t).toLocaleString('ko-KR', { month: 'numeric', 
 const KEBAB = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5.5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="18.5" r="1.6"/></svg>';
 
 // 대표 이미지: 시안에 첨부한 사진 중 처음 나오는 것
-const draftCard = (d, img, sharedAt) => {
+const draftCard = (d, img) => {
   const isCur = d.id === draftId;
-  const shareBtns = sharedAt
-    ? `<button data-share="${esc(d.id)}">공유 다시 하기</button><button data-unshare="${esc(d.id)}">공유 내리기</button>`
-    : `<button data-share="${esc(d.id)}">공유하기</button>`;
   return `<article class="dcard${isCur ? ' cur' : ''}">
-    <button class="dcard-img" data-open="${esc(d.id)}" aria-label="${esc(d.name)} 이어서 작업">${img ? `<img src="${esc(img)}" alt="">` : '<span>사진 없음</span>'}${isCur ? '<em>작업 중</em>' : ''}${sharedAt ? '<em class="shared">공유 중</em>' : ''}</button>
+    <button class="dcard-img" data-open="${esc(d.id)}" aria-label="${esc(d.name)} 이어서 작업">${img ? `<img src="${esc(img)}" alt="">` : '<span>사진 없음</span>'}${isCur ? '<em>작업 중</em>' : ''}</button>
     <p class="dcard-name">${esc(d.name)}</p>
     <div class="dcard-f"><small>${fmtSaved(d.updatedAt)}</small><button class="iconbtn" popovertarget="dm-${esc(d.id)}" aria-label="시안 메뉴">${KEBAB}</button></div>
-    <nav class="help my-menu" id="dm-${esc(d.id)}" popover aria-label="시안 메뉴"><button data-rename="${esc(d.id)}">이름 수정</button>${shareBtns}${isCur ? '' : `<button data-rm="${esc(d.id)}">시안 삭제</button>`}</nav>
+    <nav class="help my-menu" id="dm-${esc(d.id)}" popover aria-label="시안 메뉴"><button data-rename="${esc(d.id)}">이름 수정</button><button data-invite="${esc(d.id)}">초대하기</button>${isCur ? '' : `<button data-rm="${esc(d.id)}">시안 삭제</button>`}</nav>
   </article>`;
 };
 
@@ -213,224 +233,162 @@ const LEAF = 'M50 47C35 37 29 20 38 13C45 8 50 14 50 19C50 14 55 8 62 13C71 20 6
 const DEFAULT_AVATAR = `<svg class="avatar-def" viewBox="0 0 100 100" aria-hidden="true">${[45, 135, 225, 315]
   .map((r) => `<path d="${LEAF}" transform="rotate(${r} 50 50)"/>`).join('')}<path class="stem" d="M50 52q1 22 16 40"/></svg>`;
 
-// app.js 의 show('my') 가 부름
-async function renderMyPage() {
-  const [list, shares] = await Promise.all([backend.list(), backend.shares()]);
-  const sharedAt = Object.fromEntries(shares.map((x) => [x.draft_id, x.shared_at]));
-  const covers = await backend.signedUrls([...new Set(list.map((d) => photoPaths(d.data)[0]).filter(Boolean))]);
-  document.getElementById('my-avatar').innerHTML = user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : DEFAULT_AVATAR;
-  showProfile();
-  draftsEl.innerHTML = list.map((d) => draftCard(d, covers[photoPaths(d.data)[0]], sharedAt[d.id])).join('') || '<p class="note">저장된 시안이 없어요</p>';
-}
-
-// ── 레퍼런스 공유 ──
-// 공유본은 공유하기를 누른 순간의 시안. 사진이 SHARE_MIN_PHOTOS 장 이상이어야 공유되고, 공유한 사람만 남의 공유본을 봄
-// 서버(schema.sql share_data_ok)도 같은 기준으로 막음. 바꾸면 둘 다 바꿀 것
-const SHARE_MIN_PHOTOS = 10;
-const countPhotos = (data) => new Set(photoPaths(data)).size;
-
-async function shareDraft(id) {
-  try {
-    // 작업 중인 시안이면 화면 내용부터 저장해야 방금 넣은 사진까지 공유됨
-    if (id === draftId && !(await saveDraft())) return;
-    const d = await backend.get(user.id, id);
-    const n = countPhotos((({ basic, ...rest }) => rest)(d.data));
-    if (n < SHARE_MIN_PHOTOS) {
-      alert(`사진이 ${SHARE_MIN_PHOTOS}장 이상 담긴 시안만 공유할 수 있어요.\n지금 ${n}장이에요. ${SHARE_MIN_PHOTOS - n}장 더 넣어 주세요.`);
-      return;
-    }
-    if (!confirm('지금 내용 그대로 공유할까요?\n신랑·신부 이름과 촬영일은 빼고 공유돼요. 이후에 고친 내용은 \'공유 다시 하기\'를 눌러야 반영돼요.')) return;
-    await backend.share(user.id, d);
-    track('share_draft', { photos: n });
-    alert('공유했어요. 이제 다른 분들이 공유한 레퍼런스도 볼 수 있어요.');
-  } catch (err) {
-    console.error('share draft failed', err);
-    alert('공유하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
-  }
-}
-async function unshareDraft(id) {
-  const isLast = (await backend.shares()).length === 1;
-  if (!confirm(isLast ? '공유를 내릴까요?\n공유한 시안이 하나도 없으면 다른 분들의 레퍼런스도 볼 수 없어요.' : '공유를 내릴까요?')) return;
-  try {
-    await backend.unshare(id);
-    track('unshare_draft');
-  } catch (err) {
-    console.error('unshare draft failed', err);
-    alert('공유를 내리지 못했어요. 잠시 뒤 다시 시도해 주세요.');
-  }
-}
-
-// 공유 레퍼런스 화면: 목록 → 카드를 누르면 미리보기 → 내 시안으로 가져가기
-const sharedEl = document.getElementById('shared');
-const sharedPreview = document.getElementById('shared-preview');
-let sharedItems = [];
-let picked = null; // 미리보기 중인 공유본 { item, data(사진을 받은 data URL 판) }
-
-const sharedCard = (x, i, img) => `<article class="dcard">
-    <button class="dcard-img" data-pick="${i}" aria-label="${esc(x.nickname || '익명')}님 레퍼런스 보기">${img ? `<img src="${esc(img)}" alt="">` : '<span>사진 없음</span>'}</button>
-    <p class="dcard-name">${esc(x.nickname || '익명')}님의 레퍼런스</p>
-    <div class="dcard-f"><small>사진 ${countPhotos(x.data)}장 · ${fmtSaved(Date.parse(x.shared_at))} 공유</small></div>
+const invitedEl = document.getElementById('invited');
+const invitedCard = (x, img) => `<article class="dcard">
+    <button class="dcard-img" data-invited="${esc(x.code)}" aria-label="${esc(x.nickname || '익명')}님의 시안 보기">${img ? `<img src="${esc(img)}" alt="">` : '<span>사진 없음</span>'}</button>
+    <p class="dcard-name">${esc(x.name || '이름 없는 시안')}</p>
+    <div class="dcard-f"><small>${esc(x.nickname || '익명')}님 · ${fmtSaved(Date.parse(x.updated_at))} 수정</small></div>
   </article>`;
 
-// app.js 의 show('shared') 가 부름
-async function renderShared() {
-  picked = null;
-  sharedPreview.hidden = true;
-  sharedEl.hidden = false;
-  sharedEl.innerHTML = '<p class="note">불러오는 중…</p>';
+// 공유받은 시안 끝에 늘 붙는 카드. 눌러서 초대 코드를 넣으면 목록에 추가됨 (받는 초대 수는 제한 없음)
+const JOIN_CARD = `<article class="dcard">
+    <button class="dcard-img dcard-add" data-join aria-label="초대 코드 입력">+</button>
+    <p class="dcard-name">초대 코드 입력</p>
+    <div class="dcard-f"><small>받은 코드로 시안 추가</small></div>
+  </article>`;
+
+// app.js 의 show('my') 가 부름
+async function renderMyPage() {
+  const [list, invited] = await Promise.all([backend.list(), backend.invitedList()]);
+  const covers = await backend.signedUrls([...new Set([...list, ...invited].map((d) => photoPaths(d.data)[0]).filter(Boolean))]);
+  document.getElementById('my-avatar').innerHTML = user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : DEFAULT_AVATAR;
+  showProfile();
+  draftsEl.innerHTML = list.map((d) => draftCard(d, covers[photoPaths(d.data)[0]])).join('') || '<p class="note">저장된 시안이 없어요</p>';
+  invitedEl.innerHTML = invited.map((x) => invitedCard(x, covers[photoPaths(x.data)[0]])).join('') + JOIN_CARD;
+}
+// 마이페이지 탭: 레퍼런스 모음 / 공유받은 시안
+const myTabs = document.querySelector('.my-tabs');
+myTabs.addEventListener('click', (e) => {
+  const t = e.target.closest('[role=tab]');
+  if (!t) return;
+  myTabs.querySelectorAll('[role=tab]').forEach((b) => {
+    b.setAttribute('aria-selected', b === t);
+    document.getElementById(b.getAttribute('aria-controls')).hidden = b !== t;
+  });
+});
+const joinDlg = document.getElementById('join');
+const joinForm = document.getElementById('join-form');
+const joinErr = document.getElementById('join-err');
+const showJoinErr = (msg) => { joinErr.textContent = msg; joinErr.hidden = false; };
+invitedEl.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-invited]');
+  if (b) openInviteView(b.dataset.invited);
+  else if (e.target.closest('[data-join]')) {
+    joinForm.reset();
+    joinErr.hidden = true;
+    joinDlg.showModal();
+  }
+});
+document.getElementById('join-x').addEventListener('click', () => joinDlg.close());
+joinForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const code = joinForm.code.value.trim().toUpperCase();
+  joinErr.hidden = true;
   try {
-    sharedItems = await backend.sharedList();
+    await backend.joinInvite(code);
   } catch (err) {
-    sharedItems = [];
-    if (/share required/.test(err.message)) {
-      sharedEl.innerHTML = `<div class="share-lock"><p>사진이 ${SHARE_MIN_PHOTOS}장 이상 담긴 내 시안을 공유하면<br>다른 분들이 공유한 레퍼런스를 볼 수 있어요.</p><button class="btn" data-view="my">마이페이지에서 공유하기</button></div>`;
-      return;
-    }
-    console.error('shared list failed', err);
-    sharedEl.innerHTML = '<p class="note">불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.</p>';
+    const notFound = /invite not found/.test(err.message);
+    if (!notFound) console.error('join invite failed', err);
+    showJoinErr(notFound ? '초대를 찾지 못했어요. 코드를 다시 확인해 주세요.' : '불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.');
     return;
   }
-  const covers = await backend.signedUrls([...new Set(sharedItems.map((x) => photoPaths(x.data)[0]).filter(Boolean))]).catch(() => ({}));
-  sharedEl.innerHTML = sharedItems.map((x, i) => sharedCard(x, i, covers[photoPaths(x.data)[0]])).join('')
-    || '<p class="note">아직 다른 분이 공유한 레퍼런스가 없어요.</p>';
-  if (homePick) {
-    const i = sharedItems.findIndex((x) => `${x.user_id}/${x.draft_id}` === homePick);
-    homePick = null;
-    if (i >= 0) pickShared(i);
-  }
-}
-
-// 홈 피드. 공유 안 한 사람은 RLS 로 실제 목록을 못 받으므로 흐린 자리표시 타일 위에 안내를 띄움
-const homeGrid = document.getElementById('home-grid');
-const homeLock = document.getElementById('home-lock');
-const HOME_FAKE_TILES = 10;
-let homePick = null; // 홈에서 고른 공유본. renderShared 가 목록을 받은 뒤 열어 줌
-const homeTile = (x, img) => `<button class="home-tile" data-home-pick="${esc(x.user_id)}/${esc(x.draft_id)}" aria-label="${esc(x.nickname || '익명')}님 시안 보기">
-    <span class="home-img">${img ? `<img src="${esc(img)}" alt="">` : ''}</span>
-    <small>${esc(x.nickname || '익명')} · 사진 ${countPhotos(x.data)}장</small>
-  </button>`;
-const LOCK_ICON = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
-
-// 잠김 상태는 첫 줄만 선명하게. 열 수는 화면 폭에 따라 달라서 그리드 크기가 바뀔 때마다 다시 셈
-const blurBelowFirstRow = () => {
-  const cols = getComputedStyle(homeGrid).gridTemplateColumns.split(' ').length;
-  const locked = homeGrid.classList.contains('locked');
-  [...homeGrid.children].forEach((t, i) => t.classList.toggle('blur', locked && i >= cols));
-};
-new ResizeObserver(blurBelowFirstRow).observe(homeGrid);
-
-function lockHome(body) {
-  homeGrid.classList.add('locked');
-  homeGrid.innerHTML = Array.from({ length: HOME_FAKE_TILES }, (_, i) => `<div class="home-tile" aria-hidden="true"><span class="home-img c${i % 5}"></span><small>&nbsp;</small></div>`).join('');
-  blurBelowFirstRow();
-  homeLock.innerHTML = body && `<div class="home-pop">${LOCK_ICON}${body}</div>`;
-  homeLock.hidden = !body;
-}
-
-// 분류 칩: 그 분류에 사진이 있는 공유본만, 표지도 그 분류의 첫 사진으로
-let homeItems = [];
-let homeCat = '';
-async function paintHome() {
-  const pick = (x) => photoPaths(homeCat ? x.data?.[homeCat] : x.data)[0];
-  const list = homeItems.filter((x) => !homeCat || pick(x));
-  const covers = await backend.signedUrls([...new Set(list.map(pick).filter(Boolean))]).catch(() => ({}));
-  homeGrid.innerHTML = list.map((x) => homeTile(x, covers[pick(x)])).join('')
-    || `<p class="note">${homeItems.length ? '이 분류에 사진이 있는 시안이 아직 없어요.' : '아직 다른 분이 공유한 시안이 없어요.'}</p>`;
-}
-document.getElementById('home-chips').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-cat]');
-  if (!b) return;
-  homeCat = b.dataset.cat;
-  for (const c of e.currentTarget.children) c.setAttribute('aria-pressed', c === b);
-  if (!homeGrid.classList.contains('locked')) paintHome();
+  await renderMyPage();
+  // 내 시안의 코드는 서버가 받은 사람으로 기록하지 않아 목록에 안 생김
+  if (!invitedEl.querySelector(`[data-invited="${code}"]`)) return showJoinErr('내 시안의 초대 코드예요. 레퍼런스 모음에서 볼 수 있어요.');
+  joinDlg.close();
+  track('join_invite');
 });
 
-async function renderHome() {
-  if (!authChecked) return lockHome(''); // 로그인 확인 전엔 안내 없이 자리만
-  if (!user) {
-    return lockHome(`<strong>다른 커플의 시안을 보려면</strong><p>카카오로 로그인하고 사진 ${SHARE_MIN_PHOTOS}장 이상 담긴 내 시안을 공유하면 모두 볼 수 있어요.</p><button class="btn" data-login>카카오로 시작하기</button>`);
-  }
-  let items;
+// ── 초대 (보내는 쪽): 시안 메뉴의 '초대하기' → 링크·QR·코드 창 ──
+const inviteDlg = document.getElementById('invite');
+const inviteLink = (code) => `${location.origin}${location.pathname}#/invite?c=${code}`;
+let inviting = null; // 창에 띄운 { id, code }
+async function openInvite(id) {
   try {
-    items = await backend.sharedList();
+    const code = (await backend.invite(id)) || (await backend.createInvite(user.id, id));
+    inviting = { id, code };
+    const qr = qrcode(0, 'M');
+    qr.addData(inviteLink(code));
+    qr.make();
+    document.getElementById('invite-qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true, alt: '초대 링크 QR 코드' });
+    document.getElementById('invite-code').textContent = code;
+    document.getElementById('invite-send').hidden = !navigator.share;
+    inviteDlg.showModal();
+    track('open_invite');
   } catch (err) {
-    if (!/share required/.test(err.message)) {
-      console.error('home shared list failed', err);
-      return lockHome('<strong>불러오지 못했어요</strong><p>잠시 뒤 다시 시도해 주세요.</p>');
-    }
-    const n = countPhotos((({ basic, ...rest }) => rest)(state));
-    const left = SHARE_MIN_PHOTOS - n;
-    return lockHome(`<strong>내 시안을 공유하면 열려요</strong>
-      <p>사진 ${SHARE_MIN_PHOTOS}장 이상 담긴 시안을 하나 공유하면 다른 커플이 공유한 시안을 모두 볼 수 있어요.</p>
-      <div class="home-meter"><div class="home-progress"><span style="width:${Math.min(100, (n / SHARE_MIN_PHOTOS) * 100)}%"></span></div>
-      <small>지금 시안 사진 ${Math.min(n, SHARE_MIN_PHOTOS)} / ${SHARE_MIN_PHOTOS}장</small></div>
-      ${left > 0 ? `<button class="btn" data-view="edit">사진 ${left}장 더 채우기</button>` : '<button class="btn" data-view="my">마이페이지에서 공유하기</button>'}`);
+    console.error('open invite failed', err);
+    alert('초대 링크를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.');
   }
-  homeGrid.classList.remove('locked');
-  homeLock.hidden = true;
-  homeItems = items;
-  await paintHome();
 }
-
-homeGrid.addEventListener('click', (e) => {
-  const b = e.target.closest('[data-home-pick]');
-  if (!b) return;
-  homePick = b.dataset.homePick;
-  show('shared');
+document.getElementById('invite-x').addEventListener('click', () => inviteDlg.close());
+document.getElementById('invite-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(inviteLink(inviting.code));
+    alert('링크를 복사했어요.');
+    track('copy_invite');
+  } catch {
+    prompt('이 링크를 복사해 보내 주세요.', inviteLink(inviting.code)); // 클립보드 권한이 없는 브라우저
+  }
+});
+document.getElementById('invite-send').addEventListener('click', () => {
+  navigator.share({ title: '웨딩 촬영 시안', text: `초대 코드 ${inviting.code}`, url: inviteLink(inviting.code) })
+    .then(() => track('send_invite'))
+    .catch((e) => { if (e.name !== 'AbortError') console.error('share invite failed', e); });
+});
+document.getElementById('invite-off').addEventListener('click', async () => {
+  if (!confirm('초대를 끊을까요?\n지금 링크와 코드로는 더 볼 수 없어요. 다시 초대하면 새 링크가 만들어져요.')) return;
+  try {
+    await backend.revokeInvite(inviting.id);
+    inviteDlg.close();
+    track('revoke_invite');
+  } catch (err) {
+    console.error('revoke invite failed', err);
+    alert('초대를 끊지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+  }
 });
 
-async function pickShared(i) {
-  const item = sharedItems[i];
-  setStatus('레퍼런스 불러오는 중…');
+// ── 초대 (받는 쪽): #/invite?c=코드. 코드가 없거나 틀리면 입력 칸 ──
+const inviteForm = document.getElementById('invite-form');
+const inviteErr = document.getElementById('invite-err');
+const invitePreview = document.getElementById('invite-preview');
+const inviteCode = () => new URLSearchParams(location.hash.split('?')[1]).get('c')?.trim().toUpperCase() || '';
+function openInviteView(code) {
+  history.pushState(null, '', `#/invite?c=${encodeURIComponent(code)}`);
+  renderView('invite');
+}
+// app.js 의 show('invite') 가 부름. 익명 로그인이 세션 복원과 겹치지 않게 로그인 확인 뒤에만
+async function renderInvite() {
+  if (!authChecked) return;
+  const code = inviteCode();
+  inviteForm.hidden = Boolean(code);
+  invitePreview.hidden = true;
+  inviteErr.hidden = true;
+  if (!code) return;
+  setStatus('시안 불러오는 중…');
   try {
-    const data = await toLocal(item.data);
-    picked = { item, data };
-    document.getElementById('shared-who').textContent = `${item.nickname || '익명'}님의 레퍼런스`;
-    document.getElementById('shared-deck').innerHTML = renderDeck(withoutBlanks(restore(data)));
-    sharedEl.hidden = true;
-    sharedPreview.hidden = false;
-    scrollTo(0, 0);
+    const x = await backend.joinInvite(code);
+    const data = await toLocal(x.data);
+    if (inviteCode() !== code) return; // 불러오는 사이 다른 화면으로 감
+    document.getElementById('invite-who').textContent = `${x.nickname || '익명'}님이 초대한 시안 · ${x.name || '이름 없는 시안'}`;
+    document.getElementById('invite-deck').innerHTML = renderDeck(withoutBlanks(restore(data)));
+    document.getElementById('invite-keep').hidden = Boolean(user);
+    invitePreview.hidden = false;
     setStatus('');
-    track('view_shared');
+    track('view_invite', { member: Boolean(user) });
   } catch (err) {
-    console.error('open shared failed', err);
-    setStatus('레퍼런스를 불러오지 못했어요', true);
-  }
-}
-
-// 가져가기: 내 새 시안으로 통째로 복사. 사진은 toRemote 가 내 폴더로 다시 올림
-async function importShared() {
-  if (!picked) return;
-  if (!confirm('이 레퍼런스를 내 새 시안으로 가져올까요?\n가져온 시안은 자유롭게 고칠 수 있고, 원래 레퍼런스에는 영향이 없어요.')) return;
-  const btn = document.getElementById('shared-import');
-  btn.disabled = true;
-  setStatus('가져오는 중…');
-  try {
-    // 지금 작업 중인 시안의 바뀐 내용부터 저장
-    if (draftId && saveTimer && !(await saveDraft())) return;
-    const data = restore(picked.data);
-    if (!(await createDraft(data))) return setStatus('');
-    loadIntoEditor(data);
-    track('import_shared');
-  } catch (err) {
-    console.error('import shared failed', err);
+    const notFound = /invite not found/.test(err.message);
+    if (!notFound) console.error('open invite failed', err);
     setStatus('');
-    alert('가져오지 못했어요. 잠시 뒤 다시 시도해 주세요.');
-  } finally {
-    btn.disabled = false;
+    inviteForm.hidden = false;
+    inviteForm.code.value = code;
+    inviteErr.textContent = notFound ? '초대를 찾지 못했어요. 코드를 다시 확인하거나 보낸 분께 새 링크를 받아 주세요.' : '불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.';
+    inviteErr.hidden = false;
   }
 }
-
-sharedEl.addEventListener('click', (e) => {
-  const b = e.target.closest('[data-pick]');
-  if (b) pickShared(Number(b.dataset.pick));
+inviteForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  openInviteView(inviteForm.code.value.trim().toUpperCase());
 });
-document.getElementById('shared-back').addEventListener('click', () => {
-  picked = null;
-  sharedPreview.hidden = true;
-  sharedEl.hidden = false;
-});
-document.getElementById('shared-import').addEventListener('click', importShared);
 
 // 비로그인으로 시안 화면에 처음 들어오면 탭마다 한 번 로그인 권유. 로그인 상태를 확인하기 전이면 확인한 뒤에 띄움
 let authChecked = false;
@@ -443,10 +401,11 @@ function askLogin() {
 
 // 카카오에서 돌아온 직후 한 번: 비로그인으로 작업하던 내용이 있으면 새 시안으로 저장, 없으면 마지막 시안을 이어서
 // 시안이 이미 꽉 찼으면 작업 내용은 이 기기에만 두고 안내 팝업 없이 넘어감 (덮어쓰지 않음)
-async function afterLogin() {
+// view 가 null 이면 지금 화면(테스트 결과 등)을 그대로 둠
+async function afterLogin(view = 'edit') {
   const list = await backend.list();
   if (!hasContent(state)) {
-    if (list.length) await openDraft(list[0]);
+    if (list.length) await openDraft(list[0], view);
     else await createDraft(state);
   } else if (list.length < MAX_DRAFTS) await createDraft(state);
   setStatus('');
@@ -486,6 +445,14 @@ document.addEventListener('click', (e) => {
   const t = e.target;
   if (t.closest('.my-menu button')) t.closest('.my-menu').hidePopover();
   if (t.closest('[data-login]')) login();
+  else if (t.closest('[data-keep-login]')) {
+    sessionStorage.setItem(KEEP_FLAG, '1');
+    login();
+  }
+  else if (t.closest('[data-invite-login]')) {
+    sessionStorage.setItem(INVITE_FLAG, inviteCode());
+    login();
+  }
   else if (t.closest('[data-save-draft]')) saveDraft(true);
   else if (t.closest('[data-new-draft]')) newDraft();
   else if (t.closest('[data-logout]')) logout();
@@ -527,16 +494,12 @@ draftsEl.addEventListener('click', async (e) => {
       console.error('open draft failed', err);
       setStatus('시안을 불러오지 못했어요', true);
     }
+  } else if (b.dataset.invite) {
+    await openInvite(b.dataset.invite);
   } else if (b.dataset.rename) {
     if (await renameDraft(b.dataset.rename)) await renderMyPage();
-  } else if (b.dataset.share) {
-    await shareDraft(b.dataset.share);
-    await renderMyPage();
-  } else if (b.dataset.unshare) {
-    await unshareDraft(b.dataset.unshare);
-    await renderMyPage();
   } else if (b.dataset.rm) {
-    if (!confirm('이 시안을 삭제할까요?\n삭제하면 되돌릴 수 없고, 공유한 시안이면 공유도 함께 내려가요.')) return;
+    if (!confirm('이 시안을 삭제할까요?\n삭제하면 되돌릴 수 없어요.')) return;
     try {
       await backend.remove(user.id, b.dataset.rm);
       track('delete_draft');
@@ -704,7 +667,7 @@ profileForm.addEventListener('submit', async (e) => {
     if (user && sessionStorage.getItem(LOGIN_FLAG)) {
       sessionStorage.removeItem(LOGIN_FLAG);
       justLoggedIn = true;
-      await afterLogin();
+      await afterLogin(sessionStorage.getItem(KEEP_FLAG) ? null : 'edit');
     } else if (user && draftId) {
       // 다른 창·기기에서 이 시안을 더 저장했으면 그 내용으로 바꿔 둠
       const d = await backend.get(user.id, draftId);
@@ -719,7 +682,16 @@ profileForm.addEventListener('submit', async (e) => {
   // 로그인 직후에만, 닉네임·신랑신부가 비어 있으면 입력 창. 실패해도 다른 기능은 그대로 씀
   if (user) ensureProfile(justLoggedIn).catch((e) => console.error('profile load failed', e));
   authChecked = true;
-  if (viewFromHash() === 'home') renderHome();
+  // 초대 화면에서 로그인하고 돌아왔으면 그 초대를 다시 열어 마이페이지에 보관
+  // 테스트 결과 화면에서 로그인하고 돌아왔으면 그 결과를 저장
+  const keep = sessionStorage.getItem(KEEP_FLAG);
+  sessionStorage.removeItem(KEEP_FLAG);
+  const kept = keep && window.testResult?.();
+  if (user && kept) window.saveTestResult(kept);
+  const pendingInvite = sessionStorage.getItem(INVITE_FLAG);
+  sessionStorage.removeItem(INVITE_FLAG);
+  if (user && pendingInvite) openInviteView(pendingInvite);
+  else if (viewFromHash() === 'invite') renderInvite();
   if (viewFromHash() === 'edit') askLogin();
 })();
 renderAuth();
