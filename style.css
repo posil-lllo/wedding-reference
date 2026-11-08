@@ -474,7 +474,9 @@ body[data-view="view"] .ed-head [popovertarget="toc"] { display: none; } /* ëª©ì
 .cl-memo { flex-basis: 100%; grid-column: 1 / -1; margin: -4px 0 6px 28px; font-size: 12px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
 .cl-add { display: flex; gap: 8px; align-items: center; padding: 8px 16px 14px; }
 .cl-add .btn { flex: none; white-space: nowrap; }
-.cl-tips { margin: 0; padding: 12px 16px 14px 34px; border-top: 1px dashed var(--line); font-size: 13px; color: var(--muted); }
+.cl-tips { display: grid; justify-items: start; gap: 8px; padding: 12px 16px 14px; border-top: 1px dashed var(--line); font-size: 13px; color: var(--muted); }
+.cl-tips ul { margin: 0; padding-left: 18px; }
+.cl-tips-form { justify-self: stretch; display: grid; gap: 8px; }
 .cl-bar-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 20px; }
 .cl-hide { margin-left: auto; display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .cl-when { font-size: 12px; color: var(--accent-text); font-weight: 500; }

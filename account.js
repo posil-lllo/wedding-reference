@@ -108,6 +108,9 @@ const backend = {
     return must(await sb.rpc('join_invite', { c: code }))[0];
   },
   invitedList: async () => must(await sb.rpc('invited_drafts')),
+  // 체크리스트는 계정당 하나
+  checklist: async () => must(await sb.from('checklists').select('data').maybeSingle())?.data,
+  putChecklist: async (uid, s) => must(await sb.from('checklists').upsert({ user_id: uid, data: s, updated_at: new Date(s.at).toISOString() })),
   // 성향 테스트 결과는 한 번 할 때마다 쌓고, 최신 캐릭터는 프로필에도 적음 (프로필이 아직 없으면 update 는 아무 일 안 함)
   saveTestResult: async (uid, r) => {
     must(await sb.from('test_results').insert({
@@ -122,6 +125,29 @@ const backend = {
 };
 
 let user = null;
+
+// 체크리스트(checklist/app.js)는 고칠 때마다 브라우저에 저장하고, 로그인했으면 1초 모아 계정에도 저장
+// 못 올린 것은 브라우저에 남아 있다가, 다음에 열 때 브라우저 쪽이 더 나중에 고친 것이라 다시 올라감
+let clTimer;
+const clSyncErr = (on) => { document.getElementById('cl-sync-err').hidden = !on; };
+window.pushChecklist = (s) => {
+  if (!user) return;
+  clearTimeout(clTimer);
+  clTimer = setTimeout(() => backend.putChecklist(user.id, s).then(() => clSyncErr(false), (e) => {
+    console.error('checklist sync failed', e);
+    clSyncErr(true);
+  }), 1000);
+};
+// 로그인 확인 뒤 한 번: 브라우저와 계정 중 나중에 고친 쪽으로 맞춤
+// ponytail: 통째로 하나를 고름. 두 기기에서 동시에 고치면 먼저 고친 쪽이 사라짐, 그게 문제면 할 일 단위로 합칠 것
+async function syncChecklist() {
+  const sync = window.checklistSync;
+  if (!user || !sync) return;
+  const local = sync.get();
+  const remote = await backend.checklist();
+  if (remote && (remote.at || 0) > (local.at || 0)) sync.set(remote);
+  else if ((local.at || 0) > (remote?.at || 0)) await backend.putChecklist(user.id, local);
+}
 // mbti/app.js 가 테스트를 끝낸 순간 부름. 카카오 로그인한 사람만 저장 (익명·비로그인은 user 가 null)
 window.saveTestResult = (r) => {
   if (!user) return;
@@ -390,12 +416,17 @@ inviteForm.addEventListener('submit', (e) => {
   openInviteView(inviteForm.code.value.trim().toUpperCase());
 });
 
-// 비로그인으로 시안 화면에 처음 들어오면 탭마다 한 번 로그인 권유. 로그인 상태를 확인하기 전이면 확인한 뒤에 띄움
+// 비로그인으로 시안·체크리스트 화면에 처음 들어오면 탭마다 한 번 로그인 권유. 로그인 상태를 확인하기 전이면 확인한 뒤에 띄움
+const ASK_MSG = {
+  edit: '로그인하면 임시저장하고, 저장한 곳부터 이어서 할 수 있습니다.',
+  checklist: '로그인하면 체크리스트와 메모를 계정에 저장해 다른 기기에서도 이어서 볼 수 있어요.',
+};
 let authChecked = false;
 function askLogin() {
   if (!authChecked || user || sessionStorage.getItem(ASKED_FLAG)) return;
   if (localStorage.getItem(SKIP_DAY) === new Date().toDateString()) return;
   sessionStorage.setItem(ASKED_FLAG, '1');
+  document.getElementById('login-ask-msg').textContent = ASK_MSG[viewFromHash()] || ASK_MSG.edit;
   document.getElementById('login-ask').showPopover();
 }
 
@@ -414,7 +445,7 @@ async function afterLogin(view = 'edit') {
 
 async function login() {
   try {
-    sessionStorage.setItem(LOGIN_FLAG, '1');
+    sessionStorage.setItem(LOGIN_FLAG, viewFromHash()); // 로그인을 누른 화면. 돌아오면 주소의 #/... 가 빠짐
     await backend.login();
   } catch (e) {
     sessionStorage.removeItem(LOGIN_FLAG);
@@ -664,10 +695,13 @@ profileForm.addEventListener('submit', async (e) => {
       if (user) renderView(viewFromHash());
       else history.replaceState(null, '', urlOf('home'));
     }
-    if (user && sessionStorage.getItem(LOGIN_FLAG)) {
+    const loginFrom = user && sessionStorage.getItem(LOGIN_FLAG);
+    if (loginFrom) {
       sessionStorage.removeItem(LOGIN_FLAG);
       justLoggedIn = true;
-      await afterLogin(sessionStorage.getItem(KEEP_FLAG) ? null : 'edit');
+      const stay = loginFrom === 'checklist';
+      await afterLogin(sessionStorage.getItem(KEEP_FLAG) || stay ? null : 'edit');
+      if (stay) show('checklist');
     } else if (user && draftId) {
       // 다른 창·기기에서 이 시안을 더 저장했으면 그 내용으로 바꿔 둠
       const d = await backend.get(user.id, draftId);
@@ -681,6 +715,7 @@ profileForm.addEventListener('submit', async (e) => {
   }
   // 로그인 직후에만, 닉네임·신랑신부가 비어 있으면 입력 창. 실패해도 다른 기능은 그대로 씀
   if (user) ensureProfile(justLoggedIn).catch((e) => console.error('profile load failed', e));
+  syncChecklist().catch((e) => { console.error('checklist load failed', e); clSyncErr(true); });
   authChecked = true;
   // 초대 화면에서 로그인하고 돌아왔으면 그 초대를 다시 열어 마이페이지에 보관
   // 테스트 결과 화면에서 로그인하고 돌아왔으면 그 결과를 저장
@@ -692,6 +727,6 @@ profileForm.addEventListener('submit', async (e) => {
   sessionStorage.removeItem(INVITE_FLAG);
   if (user && pendingInvite) openInviteView(pendingInvite);
   else if (viewFromHash() === 'invite') renderInvite();
-  if (viewFromHash() === 'edit') askLogin();
+  if (['edit', 'checklist'].includes(viewFromHash())) askLogin();
 })();
 renderAuth();

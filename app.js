@@ -603,7 +603,7 @@ function renderView(view) {
   if (view === 'checklist') window.renderChecklist?.(); // checklist/app.js
   if (view === 'home') window.renderHomeCal?.(); // home-cal.js
   if (view === 'invite') window.renderInvite?.(); // account.js. 처음 열 때는 아직 없을 수 있고, 그때는 account.js 가 로그인 확인 뒤 부름
-  if (view === 'edit') window.askLogin?.(); // account.js. 처음 열 때는 아직 안 불렸을 수 있고, 그때는 account.js 가 로그인 확인 뒤 부름
+  if (view === 'edit' || view === 'checklist') window.askLogin?.(); // account.js. 처음 열 때는 아직 안 불렸을 수 있고, 그때는 account.js 가 로그인 확인 뒤 부름
   scrollTo(0, 0);
 }
 addEventListener('popstate', () => {

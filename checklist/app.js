@@ -7,6 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const TIPS_MAX = 1000; // 항목 메모 글자 수
   const todayIso = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
   const fmt = (iso) => iso.replaceAll('-', '.');
 
@@ -37,20 +38,27 @@
     }))),
   });
 
+  const current = (s) => ((s.v || 0) < UPGRADES.length ? upgrade(s) : s);
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(KEY));
-      if (s && Array.isArray(s.items)) return (s.v || 0) < UPGRADES.length ? upgrade(s) : s;
+      if (s && Array.isArray(s.items)) return current(s);
     } catch { /* 저장된 값이 없거나 깨졌으면 기본값으로 */ }
     return freshState();
   }
 
   let state = load();
-  save(); // upgrade 결과를 바로 저장
+  store(); // upgrade 결과를 바로 저장. 사용자가 고친 것은 아니라 at 은 그대로
   let mode = 'items'; // items: 항목별, checks: 할 일만
   let hideDone = false;
 
+  // at: 사용자가 마지막으로 고친 시각. 로그인했으면 계정에도 저장하고(account.js), 브라우저와 계정 중 나중에 고친 쪽을 씀
   function save() {
+    state = { ...state, at: Date.now() };
+    store();
+    window.pushChecklist?.(state);
+  }
+  function store() {
     try {
       localStorage.setItem(KEY, JSON.stringify(state));
     } catch (e) {
@@ -95,7 +103,7 @@
       </div>
       <ul class="cl-checks">${checks.map((c) => checkHtml(c)).join('')}</ul>
       <form class="cl-add"><input class="in" name="text" placeholder="할 일 추가" aria-label="추가할 할 일" maxlength="100"><button class="btn pill">추가</button></form>
-      ${it.tips.length ? `<ul class="cl-tips">${it.tips.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
+      <div class="cl-tips">${it.tips.length ? `<ul>${it.tips.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}<button type="button" class="cl-from" data-tips>${it.tips.length ? '메모 수정' : '메모 추가'}</button></div>
     </details>`;
   }
 
@@ -135,6 +143,16 @@
       if (c) return [it, c];
     }
     return [];
+  };
+
+  // 계정에 저장된 체크리스트 (account.js 가 로그인 확인 뒤 부름)
+  window.checklistSync = {
+    get: () => state,
+    set: (s) => {
+      state = current(s);
+      store();
+      if (document.body.dataset.view === 'checklist') window.renderChecklist();
+    },
   };
 
   window.renderChecklist = () => {
@@ -179,6 +197,22 @@
       el.scrollIntoView({ block: 'center' });
       return;
     }
+    // 항목 메모: 한 줄이 한 점. 수정 칸으로 바꿔 끼움
+    const tips = e.target.closest('[data-tips]');
+    if (tips) {
+      const it = byId(tips.closest('.cl-item').dataset.id);
+      const box = tips.closest('.cl-tips');
+      box.innerHTML = `<form class="cl-tips-form"><textarea class="in" name="tips" rows="${Math.max(3, it.tips.length + 1)}" maxlength="${TIPS_MAX}" aria-label="${esc(it.title)} 메모, 한 줄에 하나씩">${esc(it.tips.join('\n'))}</textarea>
+        <div class="crop-btns"><button type="button" class="btn soft" data-tips-x>취소</button><button class="btn">저장</button></div></form>`;
+      box.querySelector('textarea').focus();
+      return;
+    }
+    const x = e.target.closest('[data-tips-x]');
+    if (x) {
+      const item = x.closest('.cl-item');
+      item.outerHTML = itemHtml(byId(item.dataset.id), true);
+      return;
+    }
     // 케밥 메뉴. 입력 창을 띄우기 전에 메뉴부터 닫음
     const act = e.target.closest('[data-ck]');
     if (!act) return;
@@ -199,6 +233,11 @@
   });
   list.addEventListener('submit', (e) => {
     e.preventDefault();
+    if (e.target.tips) {
+      const it = byId(e.target.closest('.cl-item').dataset.id);
+      it.tips = e.target.tips.value.split('\n').map((t) => t.trim()).filter(Boolean);
+      return changed(e.target);
+    }
     const text = e.target.text.value.trim();
     if (!text) return;
     const it = byId(e.target.closest('.cl-item').dataset.id);

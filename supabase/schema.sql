@@ -184,3 +184,17 @@ create policy "members only" on public.test_results as restrictive for all to au
   using ((auth.jwt() ->> 'is_anonymous')::boolean is not true);
 revoke all on public.test_results from anon;
 grant select, insert on public.test_results to authenticated;
+
+-- 결혼 준비 체크리스트: 계정당 하나. 브라우저 저장값(checklist/app.js state)을 그대로 넣음
+create table public.checklists (
+  user_id uuid primary key default auth.uid() references auth.users on delete cascade,
+  data jsonb not null check (octet_length(data::text) <= 300000), -- 기본 항목이 약 20KB. 마구 커지는 것만 막음
+  updated_at timestamptz not null default now()
+);
+alter table public.checklists enable row level security;
+create policy "own checklist" on public.checklists for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "members only" on public.checklists as restrictive for all to authenticated
+  using ((auth.jwt() ->> 'is_anonymous')::boolean is not true);
+revoke all on public.checklists from anon;
+grant select, insert, update on public.checklists to authenticated;
