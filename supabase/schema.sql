@@ -83,7 +83,8 @@ values ('inquiries', 'inquiries', false, 2097152, array['image/jpeg']);
 create policy "anyone uploads inquiry photos" on storage.objects for insert to anon, authenticated
   with check (bucket_id = 'inquiries');
 
--- 초대: 시안 하나를 링크·QR·코드로 보여 줌 (보기만). 신랑, 메이크업샵처럼 그 시안을 같이 봐야 하는 사람에게 보냄
+-- 초대·공유: 시안 하나를 링크·QR·코드로 보여 줌 (보기만). 시안마다 초대 코드 하나, 공유 코드 하나
+-- 초대(신랑처럼 계속 볼 사람)는 받은 사람이 '초대 수락'하면 마이페이지 공유받은 시안에 남고, 공유(메이크업샵 등)는 보기만
 -- 원본 시안을 그대로 보여 줘서 고친 내용이 바로 보이고, 신랑·신부 이름과 촬영일도 보임
 -- 로그인하지 않은 사람은 브라우저가 익명 로그인(Supabase Auth 설정의 Anonymous sign-ins 를 켜야 함)해서 봄
 -- 초대를 끊으면(행 삭제) 받은 사람 모두 더 못 봄. 시안을 지워도 같이 끊김
@@ -91,8 +92,9 @@ create table public.invites (
   code text primary key check (code ~ '^[A-HJ-NP-Z2-9]{8}$'), -- 브라우저가 헷갈리는 글자(I, O, 0, 1)를 빼고 만듦
   user_id uuid not null default auth.uid(),
   draft_id text not null,
+  view_only boolean not null default false, -- 공유 코드: 수락해도 보관되지 않음
   created_at timestamptz not null default now(),
-  unique (user_id, draft_id),
+  unique (user_id, draft_id, view_only),
   foreign key (user_id, draft_id) references public.drafts (user_id, id) on delete cascade
 );
 alter table public.invites enable row level security;
@@ -106,23 +108,27 @@ create table public.invite_guests (
   code text not null references public.invites on delete cascade,
   user_id uuid not null references auth.users on delete cascade,
   joined_at timestamptz not null default now(),
+  kept boolean not null default false, -- 초대 수락함. 보기만 한 사람도 사진을 열려면 기록은 남아야 함
   primary key (code, user_id)
 );
 alter table public.invite_guests enable row level security;
 revoke all on public.invite_guests from anon, authenticated;
 
--- 초대 코드로 들어옴: 받은 사람으로 기록하고 그 시안을 돌려줌. 자기 초대 링크를 연 주인은 기록하지 않고 보여만 줌
-create function public.join_invite(c text) returns table (code text, nickname text, name text, data jsonb, updated_at timestamptz)
+-- 초대·공유 코드로 들어옴: 받은 사람으로 기록하고 그 시안을 돌려줌. keep 이면 초대 수락(공유 코드는 무시)
+-- 자기 링크를 연 주인은 기록하지 않고 보여만 줌 (kept 는 참으로 돌려줘 수락 버튼이 안 보이게)
+create function public.join_invite(c text, keep boolean default false)
+returns table (code text, nickname text, name text, data jsonb, updated_at timestamptz, view_only boolean, kept boolean)
 language plpgsql security definer set search_path = '' as $$
 begin
-  insert into public.invite_guests (code, user_id)
-    select i.code, auth.uid() from public.invites i where i.code = upper(c) and i.user_id <> auth.uid()
-    on conflict do nothing;
+  insert into public.invite_guests as g (code, user_id, kept)
+    select i.code, auth.uid(), keep and not i.view_only from public.invites i where i.code = upper(c) and i.user_id <> auth.uid()
+    on conflict on constraint invite_guests_pkey do update set kept = g.kept or excluded.kept;
   return query
-    select i.code, coalesce(p.nickname, ''), d.name, d.data, d.updated_at
+    select i.code, coalesce(p.nickname, ''), d.name, d.data, d.updated_at, i.view_only, coalesce(g.kept, true)
     from public.invites i
     join public.drafts d on d.user_id = i.user_id and d.id = i.draft_id
     left join public.profiles p on p.user_id = i.user_id
+    left join public.invite_guests g on g.code = i.code and g.user_id = auth.uid()
     where i.code = upper(c);
   if not found then
     raise exception 'invite not found' using errcode = 'P0001';
@@ -136,11 +142,11 @@ language sql stable security definer set search_path = '' as $$
   join public.invites i on i.code = g.code
   join public.drafts d on d.user_id = i.user_id and d.id = i.draft_id
   left join public.profiles p on p.user_id = i.user_id
-  where g.user_id = auth.uid()
+  where g.user_id = auth.uid() and g.kept
   order by g.joined_at desc
 $$;
-revoke execute on function public.join_invite(text), public.invited_drafts() from public, anon;
-grant execute on function public.join_invite(text), public.invited_drafts() to authenticated;
+revoke execute on function public.join_invite(text, boolean), public.invited_drafts() from public, anon;
+grant execute on function public.join_invite(text, boolean), public.invited_drafts() to authenticated;
 
 -- 받은 초대의 시안에 들어 있는 사진은 읽을 수 있음. 시안 주인 폴더의 사진만 (시안에 남의 사진 경로를 적어 넣어 읽는 것을 막음)
 create function public.is_invited_photo(path text) returns boolean language sql stable security definer set search_path = '' as $$

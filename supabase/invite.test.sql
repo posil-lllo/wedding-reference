@@ -14,9 +14,12 @@ select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000000') \gset
 insert into public.drafts (id, data) values ('a1', '{"basic":{"groom":"철수"},"dress":{"imgs":["sb:aaaaaaaa-0000-0000-0000-000000000000/1.jpg","sb:dddddddd-0000-0000-0000-000000000000/x.jpg"]}}');
 insert into public.drafts (id, data) values ('a2', '{"dress":{"imgs":["sb:aaaaaaaa-0000-0000-0000-000000000000/2.jpg"]}}');
 insert into public.invites (code, draft_id) values ('ABCD2345', 'a1');
+insert into public.invites (code, draft_id, view_only) values ('VWXY2345', 'a1', true);
 do $$ begin
   assert pg_temp.fails($q$ insert into public.invites (code, draft_id) values ('abcd0001', 'a2') $q$), 'bad code format rejected';
   assert (select name from public.join_invite('ABCD2345')) = '', 'owner can open own link';
+  assert (select kept from public.join_invite('ABCD2345')), 'owner sees no accept button';
+  assert pg_temp.fails($q$ insert into public.invites (code, draft_id) values ('ABCD2346', 'a1') $q$), 'one invite code per draft';
   assert (select count(*) from public.invited_drafts()) = 0, 'owner is not recorded as guest';
 end $$;
 
@@ -35,9 +38,17 @@ do $$ begin
   assert pg_temp.fails($q$ select * from public.invite_guests $q$), 'guest table not readable directly';
 end $$;
 
--- M: 카카오 로그인한 사람은 마이페이지 목록에 남음. A 가 시안을 고치면 바로 보임
+-- M: 카카오 로그인한 사람. 보기만 하면 목록에 안 남고, 초대 수락하면 남음. 공유 코드는 수락해도 안 남음
 select pg_temp.as_user('dddddddd-0000-0000-0000-000000000000') \gset
-select from public.join_invite('ABCD2345');
+do $$ begin
+  assert not (select kept from public.join_invite('ABCD2345')), 'viewing does not accept';
+  assert (select count(*) from public.invited_drafts()) = 0, 'viewed only, not in list';
+  assert public.is_invited_photo('aaaaaaaa-0000-0000-0000-000000000000/1.jpg'), 'viewer reads photo';
+  assert (select view_only from public.join_invite('VWXY2345', true)), 'share code is view only';
+  assert (select count(*) from public.invited_drafts()) = 0, 'share code not kept';
+  assert (select kept from public.join_invite('ABCD2345', true)), 'accept keeps';
+  assert (select kept from public.join_invite('ABCD2345')), 'viewing again keeps accepted';
+end $$;
 select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000000') \gset
 update public.drafts set name = '새 이름' where id = 'a1';
 select pg_temp.as_user('dddddddd-0000-0000-0000-000000000000') \gset
@@ -53,9 +64,9 @@ do $$ begin
   assert (select count(*) from public.invited_drafts()) = 0, 'stranger has no invites';
 end $$;
 
--- A 가 초대를 끊으면 받은 사람 모두 못 봄
+-- A 가 초대와 공유를 끊으면 받은 사람 모두 못 봄
 select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000000') \gset
-delete from public.invites where code = 'ABCD2345';
+delete from public.invites where draft_id = 'a1';
 select pg_temp.as_user('dddddddd-0000-0000-0000-000000000000') \gset
 do $$ begin
   assert (select count(*) from public.invited_drafts()) = 0, 'revoked invite gone from list';

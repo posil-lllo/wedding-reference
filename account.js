@@ -103,14 +103,14 @@ const backend = {
     const orphans = [...new Set(photoPaths(all.find((d) => d.id === id)?.data))].filter((p) => !kept.has(p));
     if (orphans.length) must(await sb.storage.from(BUCKET).remove(orphans));
   },
-  // 초대: 시안 하나를 보기만 하게 링크·QR·코드로 보냄. 시안마다 하나, 끊고 다시 만들면 새 코드
-  invite: async (id) => must(await sb.from('invites').select('code').eq('draft_id', id).maybeSingle())?.code,
-  createInvite: async (uid, id) => must(await sb.from('invites').insert({ code: newCode(), user_id: uid, draft_id: id }).select('code').single()).code,
-  revokeInvite: async (id) => must(await sb.from('invites').delete().eq('draft_id', id)),
-  // 로그인하지 않았으면 익명 로그인부터. 그래야 서버가 이 사람에게 초대받은 시안의 사진을 열어 줌
-  joinInvite: async (code) => {
+  // 초대·공유: 시안 하나를 보기만 하게 링크·QR·코드로 보냄. 시안마다 초대 코드 하나, 공유 코드(viewOnly) 하나. 끊고 다시 만들면 새 코드
+  invite: async (id, viewOnly) => must(await sb.from('invites').select('code').eq('draft_id', id).eq('view_only', viewOnly).maybeSingle())?.code,
+  createInvite: async (uid, id, viewOnly) => must(await sb.from('invites').insert({ code: newCode(), user_id: uid, draft_id: id, view_only: viewOnly }).select('code').single()).code,
+  revokeInvite: async (id, viewOnly) => must(await sb.from('invites').delete().eq('draft_id', id).eq('view_only', viewOnly)),
+  // 로그인하지 않았으면 익명 로그인부터. 그래야 서버가 이 사람에게 초대받은 시안의 사진을 열어 줌. keep: 초대 수락
+  joinInvite: async (code, keep = false) => {
     if (!must(await sb.auth.getSession()).session) must(await sb.auth.signInAnonymously());
-    return must(await sb.rpc('join_invite', { c: code }))[0];
+    return must(await sb.rpc('join_invite', { c: code, keep }))[0];
   },
   invitedList: async () => must(await sb.rpc('invited_drafts')),
   // 체크리스트는 계정당 하나
@@ -247,6 +247,7 @@ function renderAuth() {
   loginCta.hidden = Boolean(user);
   document.getElementById('keep-result').hidden = Boolean(user);
   myBtn.hidden = !user;
+  document.getElementById('send-open').hidden = !user; // 링크는 계정에 저장한 시안으로 만듦
   document.body.classList.toggle('authed', Boolean(user));
   // 로그인 확인 전에는 둘 다 아님. 체크리스트는 로그인해야 쓰고, 비로그인이면 안내 문구만 (style.css .guest)
   document.body.classList.toggle('guest', authChecked && !user);
@@ -263,7 +264,7 @@ const draftCard = (d, img) => {
     <button class="dcard-img" data-open="${esc(d.id)}" aria-label="${esc(d.name)} 이어서 작업">${img ? `<img src="${esc(img)}" alt="">` : '<span>사진 없음</span>'}${isCur ? '<em>작업 중</em>' : ''}</button>
     <p class="dcard-name">${esc(d.name)}</p>
     <div class="dcard-f"><small>${fmtSaved(d.updatedAt)}</small><button class="iconbtn" popovertarget="dm-${esc(d.id)}" aria-label="시안 메뉴">${KEBAB}</button></div>
-    <nav class="help my-menu" id="dm-${esc(d.id)}" popover aria-label="시안 메뉴"><button data-rename="${esc(d.id)}">이름 수정</button><button data-invite="${esc(d.id)}">초대하기</button><button data-rm="${esc(d.id)}">시안 삭제</button></nav>
+    <nav class="help my-menu" id="dm-${esc(d.id)}" popover aria-label="시안 메뉴"><button data-rename="${esc(d.id)}">이름 수정</button><button data-share="${esc(d.id)}">공유하기</button><button data-invite="${esc(d.id)}">초대하기</button><button data-rm="${esc(d.id)}">시안 삭제</button></nav>
   </article>`;
 };
 
@@ -325,8 +326,9 @@ joinForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const code = joinForm.code.value.trim().toUpperCase();
   joinErr.hidden = true;
+  let x;
   try {
-    await backend.joinInvite(code);
+    x = await backend.joinInvite(code, true);
   } catch (err) {
     const notFound = /invite not found/.test(err.message);
     if (!notFound) console.error('join invite failed', err);
@@ -334,31 +336,44 @@ joinForm.addEventListener('submit', async (e) => {
     return;
   }
   await renderMyPage();
+  if (x.view_only) return showJoinErr('보기만 하는 공유 코드라 추가할 수 없어요. 보낸 분께 초대 코드를 받아 주세요.');
   // 내 시안의 코드는 서버가 받은 사람으로 기록하지 않아 목록에 안 생김
   if (!invitedEl.querySelector(`[data-invited="${code}"]`)) return showJoinErr('내 시안의 초대 코드예요. 레퍼런스 모음에서 볼 수 있어요.');
   joinDlg.close();
   track('join_invite');
 });
 
-// ── 초대 (보내는 쪽): 시안 메뉴의 '초대하기' → 링크·QR·코드 창 ──
+// ── 초대·공유 (보내는 쪽): 시안 메뉴·결과 미리보기의 '초대하기'·'공유하기' → 링크·QR 창 ──
 const inviteDlg = document.getElementById('invite');
 const inviteLink = (code) => `${location.origin}${location.pathname}#/invite?c=${code}`;
-let inviting = null; // 창에 띄운 { id, code }
-async function openInvite(id) {
+const SEND_TEXT = {
+  invite: { h: '시안 초대하기', off: '초대 끊기', note: '신랑처럼 계속 같이 볼 사람에게 보내요. 받은 사람이 \'초대 수락\'을 누르면 마이페이지 공유받은 시안에 남아, 링크 없이도 다시 볼 수 있어요. 고칠 수는 없고, 내가 고친 내용은 바로 보여요. 신랑·신부 이름과 촬영일도 함께 보여요.',
+    confirm: '초대를 끊을까요?\n지금 링크와 코드로는 더 볼 수 없고, 수락한 사람의 공유받은 시안에서도 빠져요. 다시 초대하면 새 링크가 만들어져요.' },
+  share: { h: '시안 공유하기', off: '공유 끊기', note: '링크나 QR을 받은 사람은 로그인하지 않아도 이 시안을 볼 수 있어요. 보기만 하고 보관할 수는 없어요. 고칠 수는 없고, 내가 고친 내용은 바로 보여요. 신랑·신부 이름과 촬영일도 함께 보여요.',
+    confirm: '공유를 끊을까요?\n지금 링크로는 더 볼 수 없어요. 초대한 사람은 그대로 볼 수 있어요. 다시 공유하면 새 링크가 만들어져요.' },
+};
+let inviting = null; // 창에 띄운 { id, code, kind }
+async function openInvite(id, kind) {
+  const viewOnly = kind === 'share';
   try {
-    const code = (await backend.invite(id)) || (await backend.createInvite(user.id, id));
-    inviting = { id, code };
+    const code = (await backend.invite(id, viewOnly)) || (await backend.createInvite(user.id, id, viewOnly));
+    inviting = { id, code, kind };
+    const t = SEND_TEXT[kind];
     const qr = qrcode(0, 'M');
     qr.addData(inviteLink(code));
     qr.make();
-    document.getElementById('invite-qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true, alt: '초대 링크 QR 코드' });
+    document.getElementById('invite-h').textContent = t.h;
+    document.getElementById('invite-note').textContent = t.note;
+    document.getElementById('invite-off').textContent = t.off;
+    document.getElementById('invite-qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true, alt: `${t.h} 링크 QR 코드` });
     document.getElementById('invite-code').textContent = code;
+    document.getElementById('invite-code-row').hidden = viewOnly; // 코드 입력은 초대 수락이라 공유에는 안 보여 줌
     document.getElementById('invite-send').hidden = !navigator.share;
     inviteDlg.showModal();
-    track('open_invite');
+    track(`open_${kind}`);
   } catch (err) {
-    console.error('open invite failed', err);
-    alert('초대 링크를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+    console.error(`open ${kind} failed`, err);
+    alert('링크를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.');
   }
 }
 document.getElementById('invite-x').addEventListener('click', () => inviteDlg.close());
@@ -366,26 +381,40 @@ document.getElementById('invite-copy').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(inviteLink(inviting.code));
     alert('링크를 복사했어요.');
-    track('copy_invite');
+    track(`copy_${inviting.kind}`);
   } catch {
     prompt('이 링크를 복사해 보내 주세요.', inviteLink(inviting.code)); // 클립보드 권한이 없는 브라우저
   }
 });
 document.getElementById('invite-send').addEventListener('click', () => {
-  navigator.share({ title: '웨딩 촬영 시안', text: `초대 코드 ${inviting.code}`, url: inviteLink(inviting.code) })
-    .then(() => track('send_invite'))
-    .catch((e) => { if (e.name !== 'AbortError') console.error('share invite failed', e); });
+  const { code, kind } = inviting;
+  navigator.share({ title: '웨딩 촬영 시안', text: kind === 'invite' ? `초대 코드 ${code}` : '웨딩 촬영 시안을 공유했어요', url: inviteLink(code) })
+    .then(() => track(`send_${kind}`))
+    .catch((e) => { if (e.name !== 'AbortError') console.error(`send ${kind} failed`, e); });
 });
 document.getElementById('invite-off').addEventListener('click', async () => {
-  if (!confirm('초대를 끊을까요?\n지금 링크와 코드로는 더 볼 수 없어요. 다시 초대하면 새 링크가 만들어져요.')) return;
+  const { id, kind } = inviting;
+  if (!confirm(SEND_TEXT[kind].confirm)) return;
   try {
-    await backend.revokeInvite(inviting.id);
+    await backend.revokeInvite(id, kind === 'share');
     inviteDlg.close();
-    track('revoke_invite');
+    track(`revoke_${kind}`);
   } catch (err) {
-    console.error('revoke invite failed', err);
-    alert('초대를 끊지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+    console.error(`revoke ${kind} failed`, err);
+    alert('끊지 못했어요. 잠시 뒤 다시 시도해 주세요.');
   }
+});
+
+// 결과 미리보기의 '공유하기': 공유와 초대 중 고르는 안내 창. 저장 전인 시안은 먼저 저장
+const sendDlg = document.getElementById('send');
+document.getElementById('send-open').addEventListener('click', () => sendDlg.showModal());
+document.getElementById('send-x').addEventListener('click', () => sendDlg.close());
+sendDlg.addEventListener('click', async (e) => {
+  const kind = e.target.closest('[data-send]')?.dataset.send;
+  if (!kind) return;
+  if (!draftId && !(await saveDraft())) return sendDlg.close(); // 못 저장한 까닭은 saveDraft 가 상태 줄에 띄움
+  sendDlg.close();
+  await openInvite(draftId, kind);
 });
 
 // ── 초대 (받는 쪽): #/invite?c=코드. 코드가 없거나 틀리면 입력 칸 ──
@@ -410,12 +439,12 @@ async function renderInvite() {
     const x = await backend.joinInvite(code);
     const data = await toLocal(x.data);
     if (inviteCode() !== code) return; // 불러오는 사이 다른 화면으로 감
-    document.getElementById('invite-who').textContent = `${x.nickname || '익명'}님이 초대한 시안 · ${x.name || '이름 없는 시안'}`;
+    document.getElementById('invite-who').textContent = `${x.nickname || '익명'}님이 ${x.view_only ? '공유' : '초대'}한 시안 · ${x.name || '이름 없는 시안'}`;
     document.getElementById('invite-deck').innerHTML = renderDeck(withoutBlanks(restore(data)));
-    document.getElementById('invite-keep').hidden = Boolean(user);
+    showAccept(x);
     invitePreview.hidden = false;
     setStatus('');
-    track('view_invite', { member: Boolean(user) });
+    track(x.view_only ? 'view_share' : 'view_invite', { member: Boolean(user) });
   } catch (err) {
     const notFound = /invite not found/.test(err.message);
     if (!notFound) console.error('open invite failed', err);
@@ -424,6 +453,25 @@ async function renderInvite() {
     inviteForm.code.value = code;
     inviteErr.textContent = notFound ? '초대를 찾지 못했어요. 코드를 다시 확인하거나 보낸 분께 새 링크를 받아 주세요.' : '불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.';
     inviteErr.hidden = false;
+  }
+}
+// 초대면 '초대 수락' 버튼, 수락했으면 안내 문구. 공유는 보기만이라 둘 다 없음
+function showAccept(x) {
+  document.getElementById('invite-keep').hidden = x.view_only;
+  document.getElementById('invite-accept').hidden = x.kept;
+  document.getElementById('invite-kept').hidden = !x.kept;
+}
+async function acceptInvite() {
+  if (!user) {
+    sessionStorage.setItem(INVITE_FLAG, inviteCode());
+    return login();
+  }
+  try {
+    showAccept(await backend.joinInvite(inviteCode(), true));
+    track('join_invite');
+  } catch (err) {
+    console.error('accept invite failed', err);
+    alert('수락하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
   }
 }
 inviteForm.addEventListener('submit', (e) => {
@@ -479,9 +527,7 @@ async function openDraft(d, view = 'edit') {
 
 // 메뉴를 여는 아이콘 바로 아래(자리가 없으면 위), 오른쪽 끝을 맞춰 드롭다운처럼
 // 마이페이지 시안 카드 메뉴는 나중에 그려지므로 document 에서 capture 로 받음 (beforetoggle 은 버블링되지 않음)
-document.addEventListener('beforetoggle', (e) => {
-  const menu = e.target;
-  if (e.newState !== 'open' || !menu.classList?.contains('my-menu')) return;
+function placeMenu(menu) {
   const r = document.querySelector(`[popovertarget="${menu.id}"]`).getBoundingClientRect();
   menu.style.display = 'flex'; // 열리기 전 높이 재기
   const h = menu.offsetHeight;
@@ -490,7 +536,14 @@ document.addEventListener('beforetoggle', (e) => {
   menu.style.top = `${below ? r.bottom + 6 : Math.max(8, r.top - 6 - h)}px`;
   if (menu.classList.contains('main-menu')) menu.style.left = `${Math.max(8, r.left)}px`; // 왼쪽 햄버거 메뉴
   else menu.style.right = `${Math.max(8, innerWidth - r.right)}px`;
+}
+document.addEventListener('beforetoggle', (e) => {
+  if (e.newState === 'open' && e.target.classList?.contains('my-menu')) placeMenu(e.target);
 }, true);
+// 열린 채로 스크롤하거나 화면 크기가 바뀌면 버튼을 따라감 (fixed 라 그대로 두면 버튼과 떨어짐)
+const followMenus = () => document.querySelectorAll('.my-menu:popover-open').forEach(placeMenu);
+addEventListener('scroll', followMenus, { capture: true, passive: true });
+addEventListener('resize', followMenus);
 document.addEventListener('click', (e) => {
   const t = e.target;
   if (t.closest('.my-menu button')) t.closest('.my-menu').hidePopover();
@@ -499,10 +552,7 @@ document.addEventListener('click', (e) => {
     sessionStorage.setItem(KEEP_FLAG, '1');
     login();
   }
-  else if (t.closest('[data-invite-login]')) {
-    sessionStorage.setItem(INVITE_FLAG, inviteCode());
-    login();
-  }
+  else if (t.closest('[data-invite-accept]')) acceptInvite();
   else if (t.closest('[data-save-draft]')) saveDraft(true);
   else if (t.closest('[data-new-draft]')) newDraft();
   else if (t.closest('[data-logout]')) logout();
@@ -544,8 +594,8 @@ draftsEl.addEventListener('click', async (e) => {
       console.error('open draft failed', err);
       setStatus('시안을 불러오지 못했어요', true);
     }
-  } else if (b.dataset.invite) {
-    await openInvite(b.dataset.invite);
+  } else if (b.dataset.invite || b.dataset.share) {
+    await openInvite(b.dataset.invite || b.dataset.share, b.dataset.invite ? 'invite' : 'share');
   } else if (b.dataset.rename) {
     if (await renameDraft(b.dataset.rename)) await renderMyPage();
   } else if (b.dataset.rm) {
@@ -784,7 +834,7 @@ profileForm.addEventListener('submit', async (e) => {
   // 로그인 직후에만, 닉네임·신랑신부가 비어 있으면 입력 창. 실패해도 다른 기능은 그대로 씀
   if (user) ensureProfile(justLoggedIn).catch((e) => console.error('profile load failed', e));
   syncChecklist().catch((e) => { console.error('checklist load failed', e); clSyncErr(true); });
-  // 초대 화면에서 로그인하고 돌아왔으면 그 초대를 다시 열어 마이페이지에 보관
+  // 초대 화면에서 '초대 수락'으로 로그인하고 돌아왔으면 그 초대를 다시 열어 수락
   // 테스트 결과 화면에서 로그인하고 돌아왔으면 그 결과를 저장
   const keep = sessionStorage.getItem(KEEP_FLAG);
   sessionStorage.removeItem(KEEP_FLAG);
@@ -792,7 +842,10 @@ profileForm.addEventListener('submit', async (e) => {
   if (user && kept) window.saveTestResult(kept);
   const pendingInvite = sessionStorage.getItem(INVITE_FLAG);
   sessionStorage.removeItem(INVITE_FLAG);
-  if (user && pendingInvite) openInviteView(pendingInvite);
+  if (user && pendingInvite) {
+    await backend.joinInvite(pendingInvite, true).then(() => track('join_invite'), (e) => console.error('accept invite failed', e));
+    openInviteView(pendingInvite);
+  }
   else if (viewFromHash() === 'invite') renderInvite();
   if (viewFromHash() === 'edit') askLogin();
 })();
