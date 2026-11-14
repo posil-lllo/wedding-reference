@@ -206,13 +206,19 @@ function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {})
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
   };
-  const close = () => {
-    pop.hidePopover();
-    input.focus();
+  const close = () => pop.hidePopover(); // 포커스는 아래 toggle 에서 돌려줌
+  // 값이 바뀌면 체크리스트가 항목을 다시 그려 칸이 새 요소가 됨. 그때 같은 칸을 다시 찾는 선택자
+  const keyOf = (el) => {
+    if (el.id) return `#${CSS.escape(el.id)}`;
+    if (el.dataset.path) return `[data-path="${CSS.escape(el.dataset.path)}"]`;
+    const id = el.closest('[data-id]')?.dataset.id;
+    return id && el.dataset.k ? `[data-id="${CSS.escape(id)}"] [data-k="${CSS.escape(el.dataset.k)}"]` : null;
   };
+  let key = null;
 
   const open = (el) => {
     input = el;
+    key = keyOf(el);
     from = null;
     mode = el.dataset.pick === 'time' ? 'time' : 'day';
     const [y, m] = (el.value || today).slice(0, 10).split('-').map(Number);
@@ -244,8 +250,14 @@ function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {})
   }, true);
 
   // 시작일만 고르고 닫으면 그날 하루로
+  // Esc·바깥 클릭으로 닫혀도 연 칸으로 포커스를 돌려줌. 바깥의 다른 칸을 눌러 닫았으면 그 칸을 둠
   pop.addEventListener('toggle', (e) => {
-    if (e.newState === 'closed' && from) { set(from); from = null; }
+    if (e.newState !== 'closed') return;
+    if (from) { set(from); from = null; }
+    const a = document.activeElement;
+    if (a && a !== document.body && !pop.contains(a)) return;
+    const el = input.isConnected ? input : key && document.querySelector(key);
+    el?.focus({ preventScroll: true });
   });
 
   pop.addEventListener('click', (e) => {
