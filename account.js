@@ -110,7 +110,7 @@ const backend = {
   invitedList: async () => must(await sb.rpc('invited_drafts')),
   // 체크리스트는 계정당 하나
   checklist: async () => must(await sb.from('checklists').select('data').maybeSingle())?.data,
-  putChecklist: async (uid, s) => must(await sb.from('checklists').upsert({ user_id: uid, data: s, updated_at: new Date(s.at).toISOString() })),
+  putChecklist: async (uid, s) => must(await sb.from('checklists').upsert({ user_id: uid, data: s, updated_at: new Date().toISOString() })),
   // 성향 테스트 결과는 한 번 할 때마다 쌓고, 최신 캐릭터는 프로필에도 적음 (프로필이 아직 없으면 update 는 아무 일 안 함)
   saveTestResult: async (uid, r) => {
     must(await sb.from('test_results').insert({
@@ -126,27 +126,33 @@ const backend = {
 
 let user = null;
 
-// 체크리스트(checklist/app.js)는 고칠 때마다 브라우저에 저장하고, 로그인했으면 1초 모아 계정에도 저장
-// 못 올린 것은 브라우저에 남아 있다가, 다음에 열 때 브라우저 쪽이 더 나중에 고친 것이라 다시 올라감
-let clTimer;
+// 체크리스트(checklist/app.js)는 계정에만 저장. 고친 것을 1초 모아 통째로 올림
+// 못 올리면 안내만 띄우고, 다음에 고칠 때 통째로 다시 올라감
+let clTimer, clPending;
 const clSyncErr = (on) => { document.getElementById('cl-sync-err').hidden = !on; };
-window.pushChecklist = (s) => {
-  if (!user) return;
+const flushChecklist = () => {
   clearTimeout(clTimer);
-  clTimer = setTimeout(() => backend.putChecklist(user.id, s).then(() => clSyncErr(false), (e) => {
+  const s = clPending;
+  clPending = null;
+  if (!s || !user) return;
+  backend.putChecklist(user.id, s).then(() => clSyncErr(false), (e) => {
     console.error('checklist sync failed', e);
     clSyncErr(true);
-  }), 1000);
+  });
 };
-// 로그인 확인 뒤 한 번: 브라우저와 계정 중 나중에 고친 쪽으로 맞춤
-// ponytail: 통째로 하나를 고름. 두 기기에서 동시에 고치면 먼저 고친 쪽이 사라짐, 그게 문제면 할 일 단위로 합칠 것
+window.pushChecklist = (s) => {
+  if (!user) return;
+  clPending = s;
+  clearTimeout(clTimer);
+  clTimer = setTimeout(flushChecklist, 1000);
+};
+// 1초가 지나기 전에 탭을 닫거나 옮겨도 올라가게
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushChecklist(); });
+// 로그인 확인 뒤 한 번 계정에서 불러옴. 비로그인이면 체크리스트는 비어 있고 안내 문구만 보임
 async function syncChecklist() {
-  const sync = window.checklistSync;
-  if (!user || !sync) return;
-  const local = sync.get();
-  const remote = await backend.checklist();
-  if (remote && (remote.at || 0) > (local.at || 0)) { sync.set(remote); refreshDates(); }
-  else if ((local.at || 0) > (remote?.at || 0)) await backend.putChecklist(user.id, local);
+  if (!user || !window.checklistSync) return;
+  window.checklistSync.load(await backend.checklist());
+  refreshDates();
 }
 // mbti/app.js 가 테스트를 끝낸 순간 부름. 카카오 로그인한 사람만 저장 (익명·비로그인은 user 가 null)
 window.saveTestResult = (r) => {
@@ -237,6 +243,8 @@ function renderAuth() {
   document.getElementById('keep-result').hidden = Boolean(user);
   myBtn.hidden = !user;
   document.body.classList.toggle('authed', Boolean(user));
+  // 로그인 확인 전에는 둘 다 아님. 체크리스트는 로그인해야 쓰고, 비로그인이면 안내 문구만 (style.css .guest)
+  document.body.classList.toggle('guest', authChecked && !user);
 }
 
 const fmtSaved = (t) => new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -418,10 +426,10 @@ inviteForm.addEventListener('submit', (e) => {
   openInviteView(inviteForm.code.value.trim().toUpperCase());
 });
 
-// 비로그인으로 시안·체크리스트 화면에 처음 들어오면 탭마다 한 번 로그인 권유. 로그인 상태를 확인하기 전이면 확인한 뒤에 띄움
+// 비로그인으로 시안 화면에 처음 들어오면 탭마다 한 번 로그인 권유. 로그인 상태를 확인하기 전이면 확인한 뒤에 띄움
+// (체크리스트는 비로그인이면 화면 자체가 안내 문구라 권유하지 않음)
 const ASK_MSG = {
   edit: '로그인하면 임시저장하고, 저장한 곳부터 이어서 할 수 있습니다.',
-  checklist: '로그인하면 체크리스트와 메모를 계정에 저장해 다른 기기에서도 이어서 볼 수 있어요.',
 };
 let authChecked = false;
 function askLogin() {
@@ -726,7 +734,7 @@ profileForm.addEventListener('submit', async (e) => {
     if (loginFrom) {
       sessionStorage.removeItem(LOGIN_FLAG);
       justLoggedIn = true;
-      const stay = ['checklist', 'test'].includes(loginFrom); // 로그인을 누른 화면으로 돌아옴 (test 는 결과가 복원됨)
+      const stay = ['home', 'checklist', 'test'].includes(loginFrom); // 로그인을 누른 화면으로 돌아옴 (test 는 결과가 복원됨)
       await afterLogin(sessionStorage.getItem(KEEP_FLAG) || stay ? null : 'edit');
       if (stay) show(loginFrom);
     } else if (user && draftId) {
@@ -740,12 +748,13 @@ profileForm.addEventListener('submit', async (e) => {
     console.error('auth init failed', e);
     setStatus('로그인 상태를 확인하지 못했어요', true);
   }
+  authChecked = true;
+  renderAuth(); // 로그인 확인이 끝났으니 비로그인 안내(guest)를 켤 수 있음
   refreshDates(); // 계정에서 불러온 시안의 촬영일
   if (user) backend.list().then(setDraftDates).catch((e) => console.error('draft dates load failed', e));
   // 로그인 직후에만, 닉네임·신랑신부가 비어 있으면 입력 창. 실패해도 다른 기능은 그대로 씀
   if (user) ensureProfile(justLoggedIn).catch((e) => console.error('profile load failed', e));
   syncChecklist().catch((e) => { console.error('checklist load failed', e); clSyncErr(true); });
-  authChecked = true;
   // 초대 화면에서 로그인하고 돌아왔으면 그 초대를 다시 열어 마이페이지에 보관
   // 테스트 결과 화면에서 로그인하고 돌아왔으면 그 결과를 저장
   const keep = sessionStorage.getItem(KEEP_FLAG);
@@ -756,6 +765,6 @@ profileForm.addEventListener('submit', async (e) => {
   sessionStorage.removeItem(INVITE_FLAG);
   if (user && pendingInvite) openInviteView(pendingInvite);
   else if (viewFromHash() === 'invite') renderInvite();
-  if (['edit', 'checklist'].includes(viewFromHash())) askLogin();
+  if (viewFromHash() === 'edit') askLogin();
 })();
 renderAuth();

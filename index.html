@@ -130,14 +130,14 @@
 
 <!-- 결혼 준비 체크리스트 (checklist/ 폴더의 스크립트를 씀) -->
 <main class="wrap checklist" id="view-checklist" hidden>
+  <p class="note cl-guest">로그인하고 체크리스트로 결혼 준비를 관리해 보세요.</p>
   <section class="cl-hero">
     <label class="cl-date">본식일 <input class="in" type="text" readonly data-pick="date" placeholder="날짜 선택" id="cl-wedding"></label>
     <strong class="cl-dday" id="cl-dday"></strong>
     <div class="cl-prog"><span class="note" id="cl-total"></span><div class="cl-bar"><i id="cl-bar"></i></div></div>
     <button class="btn pill" id="cl-reset">처음 상태로</button>
   </section>
-  <p class="note err" id="cl-err" role="alert" hidden>이 브라우저에 저장하지 못했어요. 개인정보 보호 모드나 앱 안 브라우저라면 일반 창에서 열어 주세요.</p>
-  <p class="note err" id="cl-sync-err" role="alert" hidden>계정에 저장하지 못했어요. 이 브라우저에는 저장돼 있고, 다음에 열 때 다시 올려요.</p>
+  <p class="note err" id="cl-sync-err" role="alert" hidden>계정에 저장하지 못했어요. 다시 고치면 그때 함께 저장돼요. 그 전에 창을 닫으면 방금 고친 내용은 사라져요.</p>
   <div class="cl-bar-row">
     <div class="tabs" role="tablist" aria-label="보기 방식">
       <button class="tab" role="tab" aria-selected="true" data-cl-mode="items">항목별</button>

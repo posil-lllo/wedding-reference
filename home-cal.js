@@ -1,5 +1,5 @@
 // 홈의 '내 일정' 달력. 본식일 · 촬영일(지금 시안) · 체크리스트에서 날짜를 정한 항목을 한 달씩 보여 줌
-// 일정은 새로 저장하지 않고 각 화면에 저장된 값을 읽기만 함 (체크리스트 localStorage, 시안 state, 마이페이지 profile)
+// 일정은 새로 저장하지 않고 각 화면에 저장된 값을 읽기만 함 (계정에서 불러온 체크리스트, 시안 state, 마이페이지 profile)
 (() => {
   const el = document.getElementById('home-cal');
   const WEEK = '일월화수목금토';
@@ -25,16 +25,16 @@
     return all.find((s) => s.date >= today) || all.at(-1) || null;
   };
 
-  const checklist = () => {
-    let cl = {};
-    try { cl = JSON.parse(localStorage.getItem('posil-checklist-v1')) || {}; } catch { /* 체크리스트를 아직 안 열었으면 없음 */ }
-    return window.checklistSync?.get() || cl;
-  };
+  // 계정에서 불러온 체크리스트 (checklist/app.js). 불러오기 전에는 빈 값
+  const checklist = () => window.checklistSync?.get() || {};
   // 본식일은 로그인했으면 마이페이지 결혼 예정 날짜가 기준 (체크리스트 본식일과 서로 맞춰 둠, checklist/app.js · account.js)
   const weddingOf = (cl) => (typeof profile !== 'undefined' && profile?.wedding_date) || cl.wedding || '';
 
+  // 비로그인(body.guest, account.js)이면 체크리스트는 안 씀. 로그아웃 직후 메모리에 남은 것도 안 보임. 달력에는 지금 시안의 촬영일만
+  const isGuest = () => document.body.classList.contains('guest');
+
   function events() {
-    const cl = checklist();
+    const cl = isGuest() ? {} : checklist();
     const list = [];
     const wedding = weddingOf(cl);
     if (wedding) list.push({ date: wedding, title: '본식', kind: 'wedding', go: 'checklist' });
@@ -103,7 +103,8 @@
     // 오른쪽: 다음 할 일(날짜 없는 할 일 추천) · 다음 일정(오늘 이후). 달을 넘겨 봐도 그대로, 달력 점만 바뀜
     const todos = nextTodos(today).map(todoRow).join('');
     const upcoming = all.filter((e) => (e.end || e.date) >= today).slice(0, NEXT_MAX).map(row).join('');
-    const list = `<p class="hc-next">다음 할 일</p>${todos ? `<ul class="hc-list">${todos}</ul>` : '<p class="note hc-empty">지금 시기에 남은 할 일이 없어요.</p>'}`
+    // 비로그인: 로그인 버튼은 머리말에 있으니 여기는 문구만
+    const list = isGuest() ? '<p class="note hc-empty">로그인하고 내 일정을 관리해 보세요.</p>' : `<p class="hc-next">다음 할 일</p>${todos ? `<ul class="hc-list">${todos}</ul>` : '<p class="note hc-empty">지금 시기에 남은 할 일이 없어요.</p>'}`
       + `<p class="hc-next">다음 일정</p>${upcoming ? `<ul class="hc-list">${upcoming}</ul>` : `<p class="note hc-empty">${all.length ? '다가오는 일정이 없어요.' : '체크리스트에 날짜를 정하거나 시안에 촬영 날짜를 넣으면 여기에 보여요.'}</p>`}`;
     el.innerHTML = `<h2>내 일정</h2><div class="hc-body">
       <div class="cal">
@@ -133,4 +134,6 @@
   });
 
   window.renderHomeCal = render;
+  // 계정 확인(account.js)이 이 파일보다 먼저 끝나면 첫 그리기를 놓치므로 로드될 때 한 번 그림
+  if (document.body.dataset.view === 'home') render();
 })();

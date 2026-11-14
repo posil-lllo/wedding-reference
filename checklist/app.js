@@ -1,9 +1,8 @@
 // 홈(index.html) SPA 의 #/checklist 화면. 결혼 준비 시기별 항목 · 항목마다 일정 · 연결된 할 일 (wedding-timeline 에서 옮겨 옴)
 // 항목 일정은 사용자가 직접 정한 날(date)만 씀. 본식일로 자동 계산해 채우지 않음
 // 순서는 state.items 배열 순서 = 사용자가 정한 순서. 날짜로 다시 정렬하지 않음 ('순서 편집' 팝업에서 끌어서 바꿈)
-// ponytail: 이 브라우저의 localStorage 에만 저장. 기기를 바꿔도 이어 보려면 로그인 사용자용 Supabase 테이블을 붙일 것
+// 로그인 사용자만 씀. 계정(Supabase checklists)에만 저장하고 브라우저에는 따로 두지 않음 (account.js)
 (() => {
-  const KEY = 'posil-checklist-v1';
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -109,33 +108,15 @@
   });
 
   const current = (s) => ((s.v || 0) < UPGRADES.length ? upgrade(s) : s);
-  function load() {
-    try {
-      const s = JSON.parse(localStorage.getItem(KEY));
-      if (s && Array.isArray(s.items)) return current(s);
-    } catch { /* 저장된 값이 없거나 깨졌으면 기본값으로 */ }
-    return freshState();
-  }
 
-  let state = load();
-  store(); // upgrade 결과를 바로 저장. 사용자가 고친 것은 아니라 at 은 그대로
+  // 로그인해야 씀. 계정에서 불러오기 전(비로그인 포함)에는 null (account.js 가 checklistSync.load 로 채움)
+  let state = null;
   let mode = 'items'; // items: 항목별, checks: 할 일만
   let hideDone = false;
 
-  // at: 사용자가 마지막으로 고친 시각. 로그인했으면 계정에도 저장하고(account.js), 브라우저와 계정 중 나중에 고친 쪽을 씀
+  // 고칠 때마다 계정에 저장 (account.js 가 1초 모아 올림)
   function save() {
-    state = { ...state, at: Date.now() };
-    store();
     window.pushChecklist?.(state);
-  }
-  function store() {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(state));
-      $('cl-err').hidden = true;
-    } catch (e) {
-      console.error('checklist save failed', e);
-      $('cl-err').hidden = false;
-    }
   }
 
   // 일정: date 시작일, end 끝나는 날(하루면 ''). 칸 값은 'YYYY-MM-DD ~ YYYY-MM-DD'
@@ -258,19 +239,20 @@
     phaseStart, // 홈 '다음 할 일' 이 지금 시기를 고를 때 (home-cal.js)
     // 마이페이지에서 결혼 예정 날짜를 고치면 본식일도 같이 (account.js)
     setWedding: (d) => {
-      if (state.wedding === d) return;
+      if (!state || state.wedding === d) return;
       state.wedding = d;
       save();
       if (document.body.dataset.view === 'checklist') window.renderChecklist();
     },
-    set: (s) => {
-      state = current(s);
-      store();
+    // 계정에서 받아 온 값으로 채움. 계정에 없으면(처음 쓰는 사람) 기본 항목
+    load: (s) => {
+      state = s && Array.isArray(s.items) ? current(s) : freshState();
       if (document.body.dataset.view === 'checklist') window.renderChecklist();
     },
   };
 
   window.renderChecklist = () => {
+    if (!state) return; // 계정에서 불러오기 전. 비로그인이면 안내 문구만 보임 (style.css .cl-guest)
     // 로그인했고 마이페이지에 결혼 예정 날짜가 있으면 그게 기준 (profile 은 account.js). 본식일을 고치면 거기도 저장됨
     if (typeof profile !== 'undefined' && profile?.wedding_date) state.wedding = profile.wedding_date;
     renderHero();

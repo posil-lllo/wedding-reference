@@ -456,6 +456,10 @@ body[data-view="view"] .ed-head [popovertarget="toc"] { display: none; } /* 목�
 .cl-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .cl-bar i { display: block; height: 100%; background: var(--accent); transition: width .2s; }
 .checklist > .err { margin: 12px 0 0; }
+/* 비로그인(body.guest, account.js)이면 체크리스트 대신 안내 문구만. 로그인 확인 전에는 둘 다 아님 */
+.cl-guest { display: none; margin: 24px 0; text-align: center; }
+body.guest #view-checklist > :not(.cl-guest) { display: none; }
+body.guest .cl-guest { display: block; }
 .cl-phase { margin-top: 28px; }
 .cl-phase h2 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px; font-family: var(--serif); font-size: 17px; }
 .cl-phase h2 small { margin-left: auto; font-family: var(--sans); font-size: 12px; font-weight: 400; color: var(--muted); }
