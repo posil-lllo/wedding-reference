@@ -421,6 +421,7 @@ sendDlg.addEventListener('click', async (e) => {
 const inviteForm = document.getElementById('invite-form');
 const inviteErr = document.getElementById('invite-err');
 const invitePreview = document.getElementById('invite-preview');
+const inviteSpin = document.getElementById('invite-spin');
 const inviteCode = () => new URLSearchParams(location.hash.split('?')[1]).get('c')?.trim().toUpperCase() || '';
 function openInviteView(code) {
   history.pushState(null, '', `#/invite?c=${encodeURIComponent(code)}`);
@@ -428,27 +429,31 @@ function openInviteView(code) {
 }
 // app.js 의 show('invite') 가 부름. 익명 로그인이 세션 복원과 겹치지 않게 로그인 확인 뒤에만
 async function renderInvite() {
-  if (!authChecked) return;
+  if (!sessionChecked) return;
   const code = inviteCode();
   inviteForm.hidden = Boolean(code);
   invitePreview.hidden = true;
   inviteErr.hidden = true;
+  inviteSpin.hidden = !code;
   if (!code) return;
   setStatus('시안 불러오는 중…');
   try {
     const x = await backend.joinInvite(code);
-    const data = await toLocal(x.data);
+    const urls = await backend.signedUrls([...new Set(photoPaths(x.data))]);
+    const data = await mapStrings(x.data, async (s) => (s.startsWith('sb:') ? urls[s.slice(3)] ?? s : s)); // 사진은 내려받지 않고 서명 URL 로 바로 띄움
     if (inviteCode() !== code) return; // 불러오는 사이 다른 화면으로 감
     document.getElementById('invite-who').textContent = `${x.nickname || '익명'}님이 ${x.view_only ? '공유' : '초대'}한 시안 · ${x.name || '이름 없는 시안'}`;
     document.getElementById('invite-deck').innerHTML = renderDeck(withoutBlanks(restore(data)));
     showAccept(x);
     invitePreview.hidden = false;
+    inviteSpin.hidden = true;
     setStatus('');
     track(x.view_only ? 'view_share' : 'view_invite', { member: Boolean(user) });
   } catch (err) {
     const notFound = /invite not found/.test(err.message);
     if (!notFound) console.error('open invite failed', err);
     setStatus('');
+    inviteSpin.hidden = true;
     inviteForm.hidden = false;
     inviteForm.code.value = code;
     inviteErr.textContent = notFound ? '초대를 찾지 못했어요. 코드를 다시 확인하거나 보낸 분께 새 링크를 받아 주세요.' : '불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.';
@@ -485,6 +490,7 @@ const ASK_MSG = {
   edit: '로그인하면 임시저장하고, 저장한 곳부터 이어서 할 수 있습니다.',
 };
 let authChecked = false;
+let sessionChecked = false; // 세션 복원 끝. 초대 화면은 시안 동기화를 기다리지 않음
 function askLogin() {
   if (!authChecked || user || sessionStorage.getItem(ASKED_FLAG)) return;
   if (localStorage.getItem(SKIP_DAY) === new Date().toDateString()) return;
@@ -756,6 +762,7 @@ function openProfile(mode) {
   setNickMsg('');
   profileErr.hidden = true;
   profileDlg.showModal();
+  document.activeElement?.blur(); // iOS: 자동 포커스면 커서만 뜨고 탭해도 키보드가 안 열림
   if (mode === 'date') document.getElementById('wd-btn').click(); // 날짜만 고칠 때는 달력부터
 }
 profileDlg.addEventListener('cancel', (e) => { if (profileDlg.dataset.mode === 'onboard') e.preventDefault(); }); // 처음 받을 때는 Esc 로 닫히지 않게
@@ -804,6 +811,8 @@ profileForm.addEventListener('submit', async (e) => {
     draftId = user && localStorage.getItem('wr-draft');
     syncedAt = Number(localStorage.getItem('wr-synced')) || 0;
     renderAuth();
+    sessionChecked = true;
+    if (viewFromHash() === 'invite' && !sessionStorage.getItem(INVITE_FLAG)) renderInvite();
     if (LOGIN_VIEWS.includes(viewFromHash())) {
       if (user) renderView(viewFromHash());
       else history.replaceState(null, '', urlOf('home'));
@@ -846,7 +855,10 @@ profileForm.addEventListener('submit', async (e) => {
     await backend.joinInvite(pendingInvite, true).then(() => track('join_invite'), (e) => console.error('accept invite failed', e));
     openInviteView(pendingInvite);
   }
-  else if (viewFromHash() === 'invite') renderInvite();
+  else if (viewFromHash() === 'invite' && !sessionChecked) {
+    sessionChecked = true;
+    renderInvite();
+  }
   if (viewFromHash() === 'edit') askLogin();
 })();
 renderAuth();

@@ -89,7 +89,7 @@
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="bgpick">포인트 컬러 <input type="color" id="point-color"><input class="hex" id="point-hex" maxlength="7" spellcheck="false" aria-label="포인트 컬러 코드"></label><button class="btn pill" id="point-reset">색 초기화</button><button class="btn pill" data-view="edit">수정</button></div>
   </div>
   <div class="slides" id="deck"></div>
-  <div class="pdf-bar"><button class="btn soft" id="send-open">공유하기</button><button class="btn" id="pdf">PDF 내보내기</button></div>
+  <div class="pdf-bar"><button class="btn soft" id="pdf">PDF 내보내기</button><button class="btn" id="send-open">공유하기</button></div>
 </main>
 
 <main class="wrap mypage" id="view-my" hidden>
@@ -115,6 +115,7 @@
 
 <!-- 초대받은 시안: 링크(#/invite?c=코드)로 오면 바로 보이고, 코드만 받았으면 입력 -->
 <main class="wrap mypage" id="view-invite" hidden>
+  <div class="spin" id="invite-spin" role="status" aria-label="불러오는 중"></div>
   <form class="invite-enter" id="invite-form" hidden>
     <h2 class="refs-h">초대 코드 입력</h2>
     <p class="note">받은 초대 코드 8자리를 넣어 주세요. 로그인하지 않아도 볼 수 있어요.</p>
@@ -276,7 +277,7 @@
   <div class="crop-top"><p class="crop-h" id="send-h">시안 보내기</p><button type="button" class="crop-x" id="send-x" aria-label="닫기">✕</button></div>
   <dl class="send-kinds">
     <dt>공유</dt><dd>메이크업샵·스튜디오처럼 한 번 보여 줄 사람에게. 링크로 보기만 하고 보관할 수는 없어요.</dd>
-    <dt>초대</dt><dd>신랑 또는 신부처럼 계속 같이 볼 사람에게. 받은 사람이 '초대 수락'을 누르면 마이페이지 공유받은 시안에 남아요.</dd>
+    <dt>초대</dt><dd>받은 사람이 '초대 수락'을 누르면 마이페이지에서 볼 수 있고, 수정할 수는 없어요.</dd>
   </dl>
   <p class="note">둘 다 로그인 없이 볼 수 있고, 고칠 수는 없어요. 내가 고친 내용은 바로 보여요.</p>
   <div class="crop-btns"><button class="btn soft" data-send="share">공유하기</button><button class="btn" data-send="invite">초대하기</button></div>
