@@ -263,7 +263,7 @@ const draftCard = (d, img) => {
     <button class="dcard-img" data-open="${esc(d.id)}" aria-label="${esc(d.name)} 이어서 작업">${img ? `<img src="${esc(img)}" alt="">` : '<span>사진 없음</span>'}${isCur ? '<em>작업 중</em>' : ''}</button>
     <p class="dcard-name">${esc(d.name)}</p>
     <div class="dcard-f"><small>${fmtSaved(d.updatedAt)}</small><button class="iconbtn" popovertarget="dm-${esc(d.id)}" aria-label="시안 메뉴">${KEBAB}</button></div>
-    <nav class="help my-menu" id="dm-${esc(d.id)}" popover aria-label="시안 메뉴"><button data-rename="${esc(d.id)}">이름 수정</button><button data-invite="${esc(d.id)}">초대하기</button>${isCur ? '' : `<button data-rm="${esc(d.id)}">시안 삭제</button>`}</nav>
+    <nav class="help my-menu" id="dm-${esc(d.id)}" popover aria-label="시안 메뉴"><button data-rename="${esc(d.id)}">이름 수정</button><button data-invite="${esc(d.id)}">초대하기</button><button data-rm="${esc(d.id)}">시안 삭제</button></nav>
   </article>`;
 };
 
@@ -549,13 +549,24 @@ draftsEl.addEventListener('click', async (e) => {
   } else if (b.dataset.rename) {
     if (await renameDraft(b.dataset.rename)) await renderMyPage();
   } else if (b.dataset.rm) {
-    if (!confirm('이 시안을 삭제할까요?\n삭제하면 되돌릴 수 없어요.')) return;
+    const isCur = b.dataset.rm === draftId;
+    if (!confirm(isCur
+      ? '지금 작업 중인 시안이에요. 삭제할까요?\n삭제하면 되돌릴 수 없고, 가장 최근에 수정한 시안을 이어서 작업해요.'
+      : '이 시안을 삭제할까요?\n삭제하면 되돌릴 수 없어요.')) return;
+    const pending = isCur && saveTimer;
+    if (isCur) {
+      clearTimeout(saveTimer); // 지운 시안이 남은 저장으로 다시 생기지 않게
+      saveTimer = null;
+      await syncing;
+    }
     try {
       await backend.remove(user.id, b.dataset.rm);
       track('delete_draft');
+      if (isCur) await openLatestDraft().catch((e) => { console.error('open latest draft failed', e); setStatus('시안을 불러오지 못했어요', true); });
     } catch (err) {
       console.error('delete draft failed', err);
       alert('삭제하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+      if (pending && draftId) scheduleSave();
     }
     await renderMyPage();
   }
@@ -579,6 +590,13 @@ async function saveDraft(notify = false) {
     if (notify) alert('임시 저장하지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.\n입력한 내용은 이 기기에는 남아 있어요.');
     return false;
   }
+}
+// 작업 중인 시안을 지운 뒤: 가장 최근에 수정한 시안으로, 없으면 빈 화면. 마이페이지에 그대로 머묾
+async function openLatestDraft() {
+  setDraftId(null);
+  const [latest] = await backend.list();
+  if (latest) await openDraft(latest, null);
+  else loadIntoEditor(withOneEach({ ...DEFAULT_STATE, pointColor: state.pointColor }), null);
 }
 async function newDraft() {
   const blank = withOneEach({ ...DEFAULT_STATE, pointColor: state.pointColor });
