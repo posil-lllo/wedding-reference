@@ -267,7 +267,9 @@ textarea.in { min-height: 64px; resize: vertical; }
 .edit-bar { display: flex; gap: 8px; }
 .edit-bar [data-reset] { margin-right: auto; }
 body:not(.authed) [data-save-draft] { display: none; }
-.pdf-bar .btn { display: block; width: 100%; max-width: 360px; margin: 0 auto; padding: 12px 16px; font-size: 15px; }
+.pdf-bar { display: flex; justify-content: center; gap: 8px; }
+.pdf-bar .btn { display: block; flex: 1; max-width: 360px; padding: 12px 16px; font-size: 15px; }
+.pdf-bar #send-open { flex: 0 1 140px; }
 .deck-h { display: flex; justify-content: flex-end; align-items: end; gap: 12px; flex-wrap: wrap; }
 .slides { display: grid; gap: 28px; }
 .slide-wrap { display: grid; gap: 6px; }
