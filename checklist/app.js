@@ -1,5 +1,5 @@
 // 홈(index.html) SPA 의 #/checklist 화면. 결혼 준비 시기별 항목 · 항목마다 일정 · 연결된 할 일 (wedding-timeline 에서 옮겨 옴)
-// 항목 일정은 사용자가 직접 정한 날(date)만 씀. 예식일로 자동 계산해 채우지 않음
+// 항목 일정은 사용자가 직접 정한 날(date)만 씀. 본식일로 자동 계산해 채우지 않음
 // 순서는 state.items 배열 순서 = 사용자가 정한 순서. 날짜로 다시 정렬하지 않음 ('순서 편집' 팝업에서 끌어서 바꿈)
 // ponytail: 이 브라우저의 localStorage 에만 저장. 기기를 바꿔도 이어 보려면 로그인 사용자용 Supabase 테이블을 붙일 것
 (() => {
@@ -13,6 +13,8 @@
 
   // 기본 할 일을 나중에 바꾸면 여기에 한 줄 추가. 이미 쓰던 체크리스트에 한 번만 반영 (state.v 로 기록해 지운 할 일을 되살리지 않음)
   // rename: 기존 할 일 이름 → 새 이름 (메모가 비어 있으면 기본 메모도 채움) · add: 항목 제목 → 없으면 덧붙일 할 일 · remove: 뺄 할 일 이름 · title: 항목 제목 → 새 제목 · dropTips: 뺄 기본 메모 줄
+  // move: 할 일 이름 → 옮길 항목 제목 (완료·메모 유지, 그 항목이 없으면 제자리) · retip: 기본 메모 줄 → 새 줄 · addItems: 없으면 같은 시기 끝(없으면 맨 뒤)에 붙일 기본 항목 제목
+  // addTips: 항목 제목 → 없으면 덧붙일 기본 메모 줄 · phase: 항목 제목 → 옮길 시기 (그 시기 마지막 항목 뒤로)
   const UPGRADES = [
     { rename: { '헬퍼비·수고비 현금 봉투 준비': '사례비 봉투 준비' },
       add: { 결혼식: ['결혼반지', '가방순이용 식권', '청심환', '신랑 긴양말', '아빠들 긴양말', '2부 의상', '포토테이블 사진', '사례비 봉투 챙기기', '식권'] } },
@@ -22,6 +24,28 @@
     { dropTips: ['원하는 사진을 캡처해 당일 작가님께 보여주기. PPT로 만들어가는 커플도 많음'] },
     { title: { '스튜디오 계약': '스튜디오 선택', '드레스샵 계약': '드레스샵 투어 예약', '메이크업샵 계약': '메이크업샵 선택' } },
     { remove: ['드레스 투어 예약', '드레스 투어 동행인 섭외', '드레스샵 선택', '메이크업샵 선택'], add: { '드레스샵 투어 예약': ['드레스 투어 동행인 섭외'] } },
+    { remove: ['스드메 측에 본식 날짜 전달', '본식 당일용 체크리스트 만들기', '사회자 포함 여부 확인'],
+      rename: { '웨딩 밴드 투어': '결혼반지 투어', '웨딩 밴드 구매': '결혼반지 구매', '주례·사회자에게 공유': '주례·사회자·축가자에게 공유' },
+      move: { '혼수 비용 분담 논의': '혼수 리스트 작성 (가전·가구)', '잔금·서류 처리': '신혼집 인테리어/입주 준비', '입주 일정 확정': '신혼집 계약 마무리' },
+      add: { '본식스냅·DVD·아이폰스냅 계약': ['식전영상 포함 여부 확인'], '드레스샵 투어 예약': ['드레스샵 리스트업·투어 예약'], '메이크업샵 선택': ['메이크업샵 비교·계약'], '신혼집 계약 마무리': ['계약서 작성·계약금 납부'] },
+      title: { '주례·사회자·축가자 식순 공유': '주례·사회자·축가자 사전 점검' },
+      dropTips: ['최소 2개월 전에는 청모·발송해야 하니 이때 제작하면 여유로움'],
+      retip: { '본식스냅이 없으면 아이폰스냅·DVD 계약과 원판 촬영이 어려워 필수': '본식스냅 없는 경우, 아이폰스냅이나 DVD 계약 시 공유하고 괜찮은지 확인 필요',
+        '예약 전에 마음에 드는 곳을 예식일에 워크인으로 둘러보고 추리는 방법을 많이 씀': '예약 전에 마음에 드는 곳을 다른 본식이 열리는 날 워크인으로 둘러보고 추리는 방법을 많이 씀' },
+      addItems: ['본식 이후 정리'] },
+    { rename: { '모임통장·결혼 준비용 카드 개설': '모임통장 또는 결혼 준비용 카드 개설', '웨딩홀 리스트업·암행투어': '웨딩홀 리스트업', '웨딩홀 투어 예약': '웨딩홀 상담 예약' },
+      remove: ['신혼여행 환전·짐 싸기'],
+      add: { '예산 & 하객 수 정하기': ['한도 제한 풀기'], '본식 드레스 셀렉': ['2부 의상 준비 (대여/구매)'] },
+      addTips: { '드레스샵 투어 예약': ['드레스샵마다 2부 의상 대여·할인 혜택을 주는 곳이 있으니 투어 때 확인하기'] },
+      phase: { '신혼여행 준비물 체크': 'D-7일' } },
+    { add: { '웨딩홀 계약 & 날짜 확정': ['폐백 여부 정하기 (하면 폐백실·수모 포함 여부 확인)'], '본식 사회자·축가자 확정': ['가방순이 섭외'] } },
+    { title: { '웨딩플래너 결정 or 셀프 준비': '웨딩플래너·셀프 준비 결정', '예산 & 하객 수 정하기': '예산·하객 수 정하기', '웨딩홀 리서치 & 투어 시작': '웨딩홀 리서치·투어 시작', '웨딩홀 계약 & 날짜 확정': '웨딩홀 계약·날짜 확정', '웨딩박람회 or 플래너 통해 스드메 정보 수집': '웨딩박람회·플래너 통해 스드메 정보 수집', '예물/예단 논의 시작': '예물·예단 논의 시작', '신혼집 인테리어/입주 준비': '신혼집 인테리어·입주 준비', '청첩장 모임, 발송 시작': '청첩장 모임·발송 시작', '사회자 멘트 & 식순 확정': '사회자 멘트·식순 확정' },
+      move: { '집주인에게 이사 예정 알리기 (자취 중이면)': '신혼집 계약 마무리' } },
+    { rename: { '식전영상 포함 여부 확인': '식전 영상 포함 여부 확인', '가전 견적 비교 (성지·대명장)': '가전 견적 비교', '헤메샵 이미지 상담 요청': '메이크업샵 이미지 상담 요청', '모바일 청첩장 발송 (혼주/신랑신부 버전)': '모바일 청첩장 발송 (혼주/신랑·신부 버전)', '소품·부케 챙기기': '소품 챙기기', '스드메 날짜 확정': '촬영 날짜 확정' },
+      add: { '드레스샵 투어 예약': ['드레스 투어·드레스샵 계약'], '본식 사회자·축가자 확정': ['주례·축사자 섭외 (하는 경우)'], '사회자 멘트·식순 확정': ['사회자 멘트(대본) 받아 검토'], '웨딩홀 최종 점검': ['포토테이블 사진 고르기·인화'], 결혼식: ['부케 수령 (당일 아침)'] },
+      title: { '신부관리 (피부·다이어트 집중)': '신부 관리 (피부·다이어트 집중)' },
+      dropTips: ['설치 후 불량 체크 꼭 하기'],
+      addItems: ['혼주 한복 맞춤·가봉'] },
   ];
   const defaultMemo = new Map(DEFAULT_PHASES.flatMap(([, , , items]) => items.flatMap(([, checks]) => checks.map((c) => [].concat(c)))));
   const newCheck = (text) => ({ id: uid(), text, memo: defaultMemo.get(text) || '', done: false });
@@ -31,22 +55,54 @@
     const owner = (c) => titles.find((t) => defaultItem.get(t).texts.includes(c.text)) ?? titles[0];
     return titles.map((title, i) => ({ ...it, id: i ? uid() : it.id, title, tips: defaultItem.get(title).tips, checks: it.checks.filter((c) => owner(c) === title) }));
   };
-  function upgrade(s) {
-    const items = UPGRADES.slice(s.v || 0).reduce((items, { rename = {}, add = {}, remove = [], split = {}, title = {}, dropTips = [] }) => items.flatMap((it) => (split[it.title] ? splitItem(it, split[it.title]) : [it])).map((it) => {
+  const freshItem = (phase, months, days, [title, checks, tips]) => ({
+    id: uid(), phase, months, days, title, tips, date: '',
+    checks: checks.map((c) => { const [text, memo = ''] = [].concat(c); return { id: uid(), text, memo, done: false }; }),
+  });
+  const defaultFull = new Map(DEFAULT_PHASES.flatMap(([phase, months, days, items]) => items.map((item) => [item[0], () => freshItem(phase, months, days, item)])));
+  // move: 할 일을 빼서 모아 둔 뒤 대상 항목 끝에 붙임. 대상 항목을 사용자가 지웠으면 원래 자리에 둠
+  function moveChecks(items, move) {
+    const titles = new Set(items.map((it) => it.title));
+    const goes = (c) => titles.has(move[c.text]);
+    const moving = items.flatMap((it) => it.checks.filter(goes));
+    return items.map((it) => {
+      const kept = it.checks.filter((c) => !goes(c));
+      const have = new Set(kept.map((c) => c.text));
+      return { ...it, checks: [...kept, ...moving.filter((c) => move[c.text] === it.title && !have.has(c.text))] };
+    });
+  }
+  function movePhase(items, phase) {
+    return Object.entries(phase).reduce((list, [title, to]) => {
+      const it = list.find((x) => x.title === title);
+      const target = DEFAULT_PHASES.find(([p]) => p === to);
+      if (!it || !target || it.phase === to) return list;
+      const rest = list.filter((x) => x !== it);
+      const at = rest.findLastIndex((x) => x.phase === to) + 1 || rest.length;
+      return [...rest.slice(0, at), { ...it, phase: to, months: target[1], days: target[2] }, ...rest.slice(at)];
+    }, items);
+  }
+  function upgradeStep(items, { rename = {}, add = {}, remove = [], split = {}, title = {}, dropTips = [], move = {}, retip = {}, addItems = [], addTips = {}, phase = {} }) {
+    const next = items.flatMap((it) => (split[it.title] ? splitItem(it, split[it.title]) : [it])).map((it) => {
       const checks = it.checks.filter((c) => !remove.includes(c.text)).map((c) => (rename[c.text] ? { ...c, text: rename[c.text], memo: c.memo || defaultMemo.get(rename[c.text]) || '' } : c));
       const have = new Set(checks.map((c) => c.text));
-      return { ...it, title: title[it.title] || it.title, tips: it.tips.filter((t) => !dropTips.includes(t)), checks: [...checks, ...(add[it.title] || []).filter((t) => !have.has(t)).map(newCheck)] };
-    }), s.items);
-    return { ...s, items, v: UPGRADES.length };
+      return { ...it, title: title[it.title] || it.title, tips: [...it.tips.filter((t) => !dropTips.includes(t)).map((t) => retip[t] || t), ...(addTips[it.title] || []).filter((t) => !it.tips.includes(t))], checks: [...checks, ...(add[it.title] || []).filter((t) => !have.has(t)).map(newCheck)] };
+    });
+    const moved = movePhase(moveChecks(next, move), phase);
+    const titles = new Set(moved.map((it) => it.title));
+    // 새 기본 항목은 같은 시기 마지막 항목 뒤에, 그 시기가 없으면 맨 뒤에
+    return addItems.filter((t) => !titles.has(t)).map((t) => defaultFull.get(t)()).reduce((list, it) => {
+      const at = list.findLastIndex((x) => x.phase === it.phase) + 1 || list.length;
+      return [...list.slice(0, at), it, ...list.slice(at)];
+    }, moved);
+  }
+  function upgrade(s) {
+    return { ...s, items: UPGRADES.slice(s.v || 0).reduce(upgradeStep, s.items), v: UPGRADES.length };
   }
 
   const freshState = () => ({
     v: UPGRADES.length,
     wedding: '',
-    items: DEFAULT_PHASES.flatMap(([phase, months, days, items]) => items.map(([title, checks, tips]) => ({
-      id: uid(), phase, months, days, title, tips, date: '',
-      checks: checks.map((c) => { const [text, memo = ''] = [].concat(c); return { id: uid(), text, memo, done: false }; }),
-    }))),
+    items: DEFAULT_PHASES.flatMap(([phase, months, days, items]) => items.map((item) => freshItem(phase, months, days, item))),
   });
 
   const current = (s) => ((s.v || 0) < UPGRADES.length ? upgrade(s) : s);
@@ -130,7 +186,7 @@
     </details>`;
   }
 
-  // 시기가 시작하는 날: 예식일에서 months 개월·days 일 전. 그 달에 같은 날이 없으면 말일 (3.31 의 1개월 전 → 2.28)
+  // 시기가 시작하는 날: 본식일에서 months 개월·days 일 전. 그 달에 같은 날이 없으면 말일 (3.31 의 1개월 전 → 2.28)
   const phaseStart = (wedding, months, days) => {
     const [y, m, d] = wedding.split('-').map(Number);
     const last = new Date(y, m - 1 - months + 1, 0).getDate();
@@ -139,7 +195,7 @@
   };
 
   // 날짜를 정한 항목은 그 날짜가 들어가는 시기에 보여 줌 (저장된 phase 는 그대로라 날짜를 지우면 원래 자리로).
-  // D-12개월보다 이르면 D-12개월, 예식일 뒤면 D-DAY. 예식일이 없으면 원래 시기
+  // D-12개월보다 이르면 D-12개월, 본식 하루 뒤~1주 안은 D-DAY, 그 뒤는 D+1주. 본식일이 없으면 원래 시기
   const phaseFor = (it, starts) => {
     const d = state.wedding && dateOf(it);
     if (!d) return it.phase;
@@ -190,7 +246,7 @@
   // 계정에 저장된 체크리스트 (account.js 가 로그인 확인 뒤 부름)
   window.checklistSync = {
     get: () => state,
-    // 마이페이지에서 결혼 예정 날짜를 고치면 예식일도 같이 (account.js)
+    // 마이페이지에서 결혼 예정 날짜를 고치면 본식일도 같이 (account.js)
     setWedding: (d) => {
       if (state.wedding === d) return;
       state.wedding = d;
@@ -205,7 +261,7 @@
   };
 
   window.renderChecklist = () => {
-    // 로그인했고 마이페이지에 결혼 예정 날짜가 있으면 그게 기준 (profile 은 account.js). 예식일을 고치면 거기도 저장됨
+    // 로그인했고 마이페이지에 결혼 예정 날짜가 있으면 그게 기준 (profile 은 account.js). 본식일을 고치면 거기도 저장됨
     if (typeof profile !== 'undefined' && profile?.wedding_date) state.wedding = profile.wedding_date;
     renderHero();
     renderList();

@@ -633,13 +633,13 @@ const setDraftDates = (list) => {
   draftDates = list.map((d) => ({ id: d.id, name: d.name, date: d.data?.basic?.date || '' }));
   refreshDates();
 };
-// 예식일·촬영일이 보이는 화면(홈 내 일정, 체크리스트)을 지금 값으로 다시 그림
+// 본식일·촬영일이 보이는 화면(홈 내 일정, 체크리스트)을 지금 값으로 다시 그림
 const refreshDates = () => {
   const v = document.body.dataset.view;
   if (v === 'home') window.renderHomeCal?.();
   if (v === 'checklist') window.renderChecklist?.();
 };
-// 체크리스트에서 예식일을 고치면 결혼 예정 날짜도 그 날로 (정확한 날짜라 오차 0). 프로필이 아직 없으면 체크리스트에만 둠
+// 체크리스트에서 본식일을 고치면 결혼 예정 날짜도 그 날로 (정확한 날짜라 오차 0). 프로필이 아직 없으면 체크리스트에만 둠
 window.saveWeddingDate = (d) => {
   if (!user || !profile || (profile.wedding_date || '') === d) return;
   sb.from('profiles').update({ wedding_date: d || null, wedding_date_range: d ? 0 : null }).eq('user_id', user.id)

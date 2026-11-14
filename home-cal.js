@@ -1,4 +1,4 @@
-// 홈의 '내 일정' 달력. 예식일 · 촬영일(지금 시안) · 체크리스트에서 날짜를 정한 항목을 한 달씩 보여 줌
+// 홈의 '내 일정' 달력. 본식일 · 촬영일(지금 시안) · 체크리스트에서 날짜를 정한 항목을 한 달씩 보여 줌
 // 일정은 새로 저장하지 않고 각 화면에 저장된 값을 읽기만 함 (체크리스트 localStorage, 시안 state, 마이페이지 profile)
 (() => {
   const el = document.getElementById('home-cal');
@@ -29,9 +29,9 @@
     let cl = {};
     try { cl = JSON.parse(localStorage.getItem('posil-checklist-v1')) || {}; } catch { /* 체크리스트를 아직 안 열었으면 없음 */ }
     const list = [];
-    // 예식일은 로그인했으면 마이페이지 결혼 예정 날짜가 기준 (체크리스트 예식일과 서로 맞춰 둠, checklist/app.js · account.js)
+    // 본식일은 로그인했으면 마이페이지 결혼 예정 날짜가 기준 (체크리스트 본식일과 서로 맞춰 둠, checklist/app.js · account.js)
     const wedding = (typeof profile !== 'undefined' && profile?.wedding_date) || cl.wedding || '';
-    if (wedding) list.push({ date: wedding, title: '예식', kind: 'wedding', go: 'checklist' });
+    if (wedding) list.push({ date: wedding, title: '본식', kind: 'wedding', go: 'checklist' });
     const sh = shoots();
     sh.forEach((x) => list.push({ ...x, title: '웨딩촬영', kind: 'shoot' }));
     // 체크리스트 '웨딩촬영' 항목이 시안 촬영일과 같은 날이면 겹쳐 넣지 않음 (checklist/app.js shootOf)

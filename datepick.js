@@ -144,7 +144,7 @@ function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {})
   };
 }
 
-// 날짜·시간 칸 공용 팝업. <input data-pick="date|range|time" readonly> 를 누르면 열림 (체크리스트 예식일·일정, 시안 촬영 날짜·시간)
+// 날짜·시간 칸 공용 팝업. <input data-pick="date|range|time" readonly> 를 누르면 열림 (체크리스트 본식일·일정, 시안 촬영 날짜·시간)
 // 값은 기본 입력과 같은 YYYY-MM-DD / HH:MM 이고, range 는 두 번 눌러 'YYYY-MM-DD ~ YYYY-MM-DD' (같은 날이거나 하나만 고르고 닫으면 YYYY-MM-DD).
 // 고르면 고르면 input·change 이벤트를 보내 기존 저장 코드가 그대로 받음
 // 넓은 화면은 칸 아래 카드, 좁은 화면은 아래에서 올라오는 시트 (위치는 CSS 가 --x/--y 로 잡음)
