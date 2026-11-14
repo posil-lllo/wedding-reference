@@ -14,7 +14,7 @@
   // 기본 할 일을 나중에 바꾸면 여기에 한 줄 추가. 이미 쓰던 체크리스트에 한 번만 반영 (state.v 로 기록해 지운 할 일을 되살리지 않음)
   // rename: 기존 할 일 이름 → 새 이름 (메모가 비어 있으면 기본 메모도 채움) · add: 항목 제목 → 없으면 덧붙일 할 일 · remove: 뺄 할 일 이름 · title: 항목 제목 → 새 제목 · dropTips: 뺄 기본 메모 줄
   // move: 할 일 이름 → 옮길 항목 제목 (완료·메모 유지, 그 항목이 없으면 제자리) · retip: 기본 메모 줄 → 새 줄 · addItems: 없으면 같은 시기 끝(없으면 맨 뒤)에 붙일 기본 항목 제목
-  // addTips: 항목 제목 → 없으면 덧붙일 기본 메모 줄 · phase: 항목 제목 → 옮길 시기 (그 시기 마지막 항목 뒤로)
+  // addTips: 항목 제목 → 없으면 덧붙일 기본 메모 줄 · phase: 항목 제목 → 옮길 시기 (그 시기 마지막 항목 뒤로) · removeItems: 뺄 기본 항목 제목 (날짜나 끝낸 할 일이 있으면 남김)
   const UPGRADES = [
     { rename: { '헬퍼비·수고비 현금 봉투 준비': '사례비 봉투 준비' },
       add: { 결혼식: ['결혼반지', '가방순이용 식권', '청심환', '신랑 긴양말', '아빠들 긴양말', '2부 의상', '포토테이블 사진', '사례비 봉투 챙기기', '식권'] } },
@@ -46,6 +46,8 @@
       title: { '신부관리 (피부·다이어트 집중)': '신부 관리 (피부·다이어트 집중)' },
       dropTips: ['설치 후 불량 체크 꼭 하기'],
       addItems: ['혼주 한복 맞춤·가봉'] },
+    { removeItems: ['웨딩박람회·플래너 통해 스드메 정보 수집'],
+      title: { '양가 상견례': '상견례', '본식스냅·DVD·아이폰스냅 계약': '스냅 계약', '혼수 리스트 작성 (가전·가구)': '혼수 리스트 작성', '혼수 계약 (가전·가구)': '혼수 계약' } },
   ];
   const defaultMemo = new Map(DEFAULT_PHASES.flatMap(([, , , items]) => items.flatMap(([, checks]) => checks.map((c) => [].concat(c)))));
   const newCheck = (text) => ({ id: uid(), text, memo: defaultMemo.get(text) || '', done: false });
@@ -81,8 +83,9 @@
       return [...rest.slice(0, at), { ...it, phase: to, months: target[1], days: target[2] }, ...rest.slice(at)];
     }, items);
   }
-  function upgradeStep(items, { rename = {}, add = {}, remove = [], split = {}, title = {}, dropTips = [], move = {}, retip = {}, addItems = [], addTips = {}, phase = {} }) {
-    const next = items.flatMap((it) => (split[it.title] ? splitItem(it, split[it.title]) : [it])).map((it) => {
+  function upgradeStep(items, { rename = {}, add = {}, remove = [], split = {}, title = {}, dropTips = [], move = {}, retip = {}, addItems = [], addTips = {}, phase = {}, removeItems = [] }) {
+    // 뺄 기본 항목은 날짜를 정했거나 끝낸 할 일이 있으면 사용자가 쓰던 것이라 남김
+    const next = items.filter((it) => !(removeItems.includes(it.title) && !it.date && !it.checks.some((c) => c.done))).flatMap((it) => (split[it.title] ? splitItem(it, split[it.title]) : [it])).map((it) => {
       const checks = it.checks.filter((c) => !remove.includes(c.text)).map((c) => (rename[c.text] ? { ...c, text: rename[c.text], memo: c.memo || defaultMemo.get(rename[c.text]) || '' } : c));
       const have = new Set(checks.map((c) => c.text));
       return { ...it, title: title[it.title] || it.title, tips: [...it.tips.filter((t) => !dropTips.includes(t)).map((t) => retip[t] || t), ...(addTips[it.title] || []).filter((t) => !it.tips.includes(t))], checks: [...checks, ...(add[it.title] || []).filter((t) => !have.has(t)).map(newCheck)] };
@@ -149,13 +152,16 @@
   };
   const byId = (id) => state.items.find((it) => it.id === id);
   const doneCount = (it) => it.checks.filter((c) => c.done).length;
+  // 항목 상태: 케밥 메뉴에서 정한 status(done 완료 / doing 진행중)가 먼저, 없으면 할 일을 다 끝냈는지로
+  const isItemDone = (it) => it.status === 'done' || (it.status !== 'doing' && it.checks.length > 0 && doneCount(it) === it.checks.length);
 
   function renderHero() {
     $('cl-wedding').value = state.wedding;
     const diff = state.wedding ? Math.round((Date.parse(state.wedding) - Date.parse(todayIso())) / 86400000) : null;
     $('cl-dday').textContent = diff === null ? '' : diff > 0 ? `D-${diff}` : diff === 0 ? 'D-Day' : `D+${-diff}`;
-    const all = state.items.flatMap((it) => it.checks);
-    const done = all.filter((c) => c.done).length;
+    // 진행률은 항목 기준. 케밥 메뉴의 완료 표시와 할 일을 다 끝낸 항목을 함께 셈 (isItemDone)
+    const all = state.items;
+    const done = all.filter(isItemDone).length;
     const pct = all.length ? Math.round((done / all.length) * 100) : 0;
     $('cl-total').textContent = `${done} / ${all.length} 완료 (${pct}%)`;
     $('cl-bar').style.width = `${pct}%`;
@@ -172,11 +178,14 @@
 
   function itemHtml(it, open) {
     const n = doneCount(it);
-    const allDone = it.checks.length > 0 && n === it.checks.length;
+    const allDone = isItemDone(it);
     const when = whenText(it);
     const checks = hideDone ? it.checks.filter((c) => !c.done) : it.checks;
+    const toggle = (k, label) => `<button type="button" data-ik="${k}">${it.status === k ? `${label} 취소` : label}</button>`;
     return `<details class="cl-item${allDone ? ' done' : ''}" data-id="${it.id}"${open ? ' open' : ''}>
-      <summary><span class="cl-title">${esc(it.title)}</span>${when ? `<span class="cl-when">${when}</span>` : ''}<span class="note">${n} / ${it.checks.length}</span></summary>
+      <summary><span class="cl-title">${esc(it.title)}</span>${when ? `<span class="cl-when">${when}</span>` : ''}<span class="note">${n} / ${it.checks.length}</span>
+        <button type="button" class="iconbtn cl-kebab" popovertarget="im-${it.id}" aria-label="${esc(it.title)} 메뉴">${KEBAB_ICON}</button>
+        <nav class="help my-menu" id="im-${it.id}" popover aria-label="항목 메뉴">${toggle('done', '완료')}${toggle('doing', '진행중')}<button type="button" data-ik="rename">이름 수정</button><button type="button" data-ik="rm">삭제</button></nav></summary>
       <div class="cl-sched">
         <label>일정 <input class="in" type="text" readonly data-pick="range" placeholder="날짜·기간 선택" size="23" data-k="date" value="${rangeVal(dated(it))}"></label>
       </div>
@@ -246,6 +255,7 @@
   // 계정에 저장된 체크리스트 (account.js 가 로그인 확인 뒤 부름)
   window.checklistSync = {
     get: () => state,
+    phaseStart, // 홈 '다음 할 일' 이 지금 시기를 고를 때 (home-cal.js)
     // 마이페이지에서 결혼 예정 날짜를 고치면 본식일도 같이 (account.js)
     setWedding: (d) => {
       if (state.wedding === d) return;
@@ -321,7 +331,29 @@
       item.outerHTML = itemHtml(byId(item.dataset.id), true);
       return;
     }
-    // 케밥 메뉴. 입력 창을 띄우기 전에 메뉴부터 닫음
+    // 항목 케밥 메뉴: 완료·진행중(다시 누르면 취소) · 이름 수정 · 삭제
+    const ik = e.target.closest('[data-ik]');
+    if (ik) {
+      ik.closest('.my-menu').hidePopover();
+      const el = ik.closest('.cl-item');
+      const it = byId(el.dataset.id);
+      const k = ik.dataset.ik;
+      if (k === 'rm') {
+        if (!confirm(`'${it.title}' 항목을 할 일까지 모두 지울까요?`)) return;
+        state.items = state.items.filter((x) => x !== it);
+        save();
+        renderHero();
+        return renderList();
+      }
+      if (k === 'rename') {
+        const input = prompt('항목 이름 (100자까지)', it.title);
+        const v = input?.trim().slice(0, 100);
+        if (!v) return; // 취소했거나 비웠으면 그대로
+        it.title = v;
+      } else it.status = it.status === k ? '' : k;
+      return changed(el);
+    }
+    // 할 일 케밥 메뉴. 입력 창을 띄우기 전에 메뉴부터 닫음
     const act = e.target.closest('[data-ck]');
     if (!act) return;
     act.closest('.my-menu').hidePopover();

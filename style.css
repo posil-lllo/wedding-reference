@@ -366,22 +366,25 @@ html { scroll-behavior: smooth; scrollbar-gutter: stable; } /* 스크롤바 유�
 .home-cal .cal-g .today { font-weight: 700; }
 .home-cal .cal-g .today::before { content: ''; position: absolute; inset: 0; max-width: 34px; max-height: 34px; margin: auto; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--accent); }
 /* 공휴일 이름 (홈 달력·날짜 팝업, datepick.js holidayOf) */
-.cal-g.days > .hol { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+.cal-g.days > .hol, .home-cal .cal-g .lab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
 .cal-g.days > .hol:not([aria-pressed="true"], :disabled) { color: #d0675c; }
 .cal-g.days > .hol small { font-size: 8px; font-weight: 400; line-height: 1; letter-spacing: -0.3px; white-space: nowrap; }
-.home-cal .cal-g b { position: absolute; bottom: 3px; display: flex; gap: 2px; }
+.home-cal .cal-g .lab small { max-width: 100%; overflow: hidden; font-size: 8px; font-weight: 400; line-height: 1.1; letter-spacing: -0.3px; white-space: nowrap; }
+.home-cal .cal-g .lab small.todo { color: var(--accent); }
+.home-cal .cal-g .lab small.wedding { color: #d0675c; }
+.home-cal .cal-g .lab small.shoot { color: #c99a3c; }
 .home-cal em { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex: none; }
 .home-cal em.wedding { background: #d0675c; }
 .home-cal em.shoot { background: #c99a3c; }
-.hc-list { list-style: none; margin: 46px 0 0; padding: 0; }
+.hc-list { list-style: none; margin: 0; padding: 0; }
 .hc-list button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 8px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
 .hc-list button:hover { background: var(--ivory); }
 .hc-d { flex: none; min-width: 76px; font-size: 13px; color: var(--sub2); }
 .hc-t { display: flex; flex-direction: column; gap: 2px; }
-.hc-empty { margin: 46px 0 0; }
-.hc-next { margin: 46px 0 4px; padding: 0 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
-.hc-next + .hc-list { margin-top: 0; }
-@media (max-width: 640px) { .hc-body { grid-template-columns: 1fr; gap: 8px; } .hc-list, .hc-empty, .hc-next { margin-top: 0; } .home-cal { padding: 16px; } }
+.hc-empty { margin: 0; padding: 10px 8px; }
+.hc-next { margin: 0 0 4px; padding: 0 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.hc-list + .hc-next, .hc-empty + .hc-next { margin-top: 20px; }
+@media (max-width: 640px) { .hc-body { grid-template-columns: 1fr; gap: 8px; } .home-cal { padding: 16px; } }
 @media (max-width: 760px) {
   .wrap.home { padding: 40px 16px 32px; }
   .home-actions { flex-direction: column; }
@@ -459,6 +462,7 @@ body[data-view="view"] .ed-head [popovertarget="toc"] { display: none; } /* 목�
 .cl-item { border: 1px solid var(--line); border-radius: 10px; background: var(--paper); margin-bottom: 8px; }
 .cl-item summary { display: flex; gap: 12px; align-items: center; padding: 12px 16px; cursor: pointer; }
 .cl-title { flex: 1; font-weight: 500; }
+.cl-item summary .cl-kebab { flex: none; margin: -6px -8px -6px -4px; }
 .cl-item.done .cl-title { color: var(--muted); text-decoration: line-through; }
 .cl-checks { list-style: none; margin: 0; padding: 0 16px; display: grid; gap: 2px; }
 .cl-checks li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }

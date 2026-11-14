@@ -25,12 +25,18 @@
     return all.find((s) => s.date >= today) || all.at(-1) || null;
   };
 
-  function events() {
+  const checklist = () => {
     let cl = {};
     try { cl = JSON.parse(localStorage.getItem('posil-checklist-v1')) || {}; } catch { /* 체크리스트를 아직 안 열었으면 없음 */ }
+    return window.checklistSync?.get() || cl;
+  };
+  // 본식일은 로그인했으면 마이페이지 결혼 예정 날짜가 기준 (체크리스트 본식일과 서로 맞춰 둠, checklist/app.js · account.js)
+  const weddingOf = (cl) => (typeof profile !== 'undefined' && profile?.wedding_date) || cl.wedding || '';
+
+  function events() {
+    const cl = checklist();
     const list = [];
-    // 본식일은 로그인했으면 마이페이지 결혼 예정 날짜가 기준 (체크리스트 본식일과 서로 맞춰 둠, checklist/app.js · account.js)
-    const wedding = (typeof profile !== 'undefined' && profile?.wedding_date) || cl.wedding || '';
+    const wedding = weddingOf(cl);
     if (wedding) list.push({ date: wedding, title: '본식', kind: 'wedding', go: 'checklist' });
     const sh = shoots();
     sh.forEach((x) => list.push({ ...x, title: '웨딩촬영', kind: 'shoot' }));
@@ -53,6 +59,24 @@
   };
 
   const NEXT_MAX = 3;
+  const CELL_MAX = 2; // 달력 칸 하나에 보이는 일정 수
+  const CELL_CHARS = 5; // 달력 칸 일정 이름 최대 글자 수 (칸 너비 약 40px)
+  const TODO_MAX = 2;
+  // 다음 할 일: 날짜를 안 정하고 아직 안 끝낸 항목 중 지금 시기(본식일 기준) 것 먼저, 모자라면 지난 시기에 밀린 것
+  // 본식일이 없으면 앞 시기부터
+  function nextTodos(today) {
+    const cl = checklist();
+    const wedding = weddingOf(cl);
+    const order = DEFAULT_PHASES.map(([p]) => p);
+    const starts = wedding && window.checklistSync ? DEFAULT_PHASES.map(([, months, days]) => window.checklistSync.phaseStart(wedding, months, days)) : [];
+    const cur = starts.findLastIndex((s) => s <= today);
+    const rank = (p) => { const i = order.indexOf(p); return i === cur ? -1 : i; };
+    return (cl.items || []).filter((it) => !it.date && (cur < 0 || order.indexOf(it.phase) <= cur))
+      .filter((it) => it.status !== 'done' && (it.status === 'doing' || !it.checks.length || it.checks.some((c) => !c.done))) // 끝낸 항목은 빼고 항목 단위로 (체크리스트 isItemDone 과 같은 기준)
+      .sort((a, b) => rank(a.phase) - rank(b.phase)) // 같은 시기 안에서는 체크리스트 순서 그대로 (sort 는 안정 정렬)
+      .slice(0, TODO_MAX);
+  }
+  const todoRow = (it) => `<li><button type="button" data-view="checklist"><span class="hc-d">${esc(it.phase)}</span><em class="todo"></em><span class="hc-t">${esc(it.title)}</span></button></li>`;
   const row = (e) => {
     const [yy, mm, dd] = e.date.split('-').map(Number); // 기간이 지난달부터 걸치면 시작일은 다른 달·해
     const w = WEEK[new Date(yy, mm - 1, dd).getDay()];
@@ -70,14 +94,17 @@
     let cells = WEEK.split('').map((w) => `<i>${w}</i>`).join('') + '<span></span>'.repeat(new Date(y, m, 1).getDay());
     for (let d = 1, last = new Date(y, m + 1, 0).getDate(); d <= last; d++) {
       const v = isoOf(y, m, d);
-      const kinds = [...new Set(month.filter((e) => on(e, v)).map((e) => e.kind))];
+      const evs = month.filter((e) => on(e, v));
       const hol = holidayOf(y, m, d);
-      cells += `<span class="${[v === today && 'today', hol && 'hol'].filter(Boolean).join(' ')}">${d}${hol ? `<small>${hol}</small>` : ''}${kinds.length ? `<b>${kinds.map((k) => `<em class="${k}"></em>`).join('')}</b>` : ''}</span>`;
+      // 일정 이름을 날짜 아래에 (최대 2개, 길면 자름). 공휴일 이름보다 일정이 먼저
+      const labels = evs.length ? evs.slice(0, CELL_MAX).map((e) => `<small class="${e.kind}">${esc([...e.title].slice(0, CELL_CHARS).join('').trim())}</small>`).join('') : hol ? `<small>${hol}</small>` : '';
+      cells += `<span class="${[v === today && 'today', hol && 'hol', labels && 'lab'].filter(Boolean).join(' ')}">${d}${labels}</span>`;
     }
-    // 보는 달에 일정이 없으면 오늘 이후 다가오는 일정을 대신 보여 줌
-    const upcoming = month.length ? [] : all.filter((e) => (e.end || e.date) >= today).slice(0, NEXT_MAX);
-    const rows = (month.length ? month : upcoming).map(row).join('');
-    const list = rows ? `${upcoming.length ? '<p class="hc-next">다음 일정</p>' : ''}<ul class="hc-list">${rows}</ul>` : `<p class="note hc-empty">${all.length ? '다가오는 일정이 없어요.' : '체크리스트에 날짜를 정하거나 시안에 촬영 날짜를 넣으면 여기에 보여요.'}</p>`;
+    // 오른쪽: 다음 할 일(날짜 없는 할 일 추천) · 다음 일정(오늘 이후). 달을 넘겨 봐도 그대로, 달력 점만 바뀜
+    const todos = nextTodos(today).map(todoRow).join('');
+    const upcoming = all.filter((e) => (e.end || e.date) >= today).slice(0, NEXT_MAX).map(row).join('');
+    const list = `<p class="hc-next">다음 할 일</p>${todos ? `<ul class="hc-list">${todos}</ul>` : '<p class="note hc-empty">지금 시기에 남은 할 일이 없어요.</p>'}`
+      + `<p class="hc-next">다음 일정</p>${upcoming ? `<ul class="hc-list">${upcoming}</ul>` : `<p class="note hc-empty">${all.length ? '다가오는 일정이 없어요.' : '체크리스트에 날짜를 정하거나 시안에 촬영 날짜를 넣으면 여기에 보여요.'}</p>`}`;
     el.innerHTML = `<h2>내 일정</h2><div class="hc-body">
       <div class="cal">
         ${mode === 'day' ? `${head(`<button type="button" class="cal-t" data-mode="year">${y}년 ${m + 1}월</button>`, 1, '달')}
