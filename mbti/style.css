@@ -1,4 +1,8 @@
-:root {
+/* 성향 테스트(#/test) · 캐릭터 모아 보기(#/chars). 홈 SPA 안의 화면이라 .mbti 아래로만 적용한다.
+   홈 style.css 와 겹치는 클래스(card, sub, pair, ghost, kakao)는 t- 를 붙여 피함 */
+body:is([data-view="test"], [data-view="chars"]) { background: #fff8f3; }
+
+.mbti {
   --bg: #fff8f3;
   --card: #ffffff;
   --ink: #4a3a3a;
@@ -6,38 +10,29 @@
   --pink: #f4a7b9;
   --pink-soft: #fde4ea;
   --line: #f1dcd6;
-}
-
-* { box-sizing: border-box; }
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
-  word-break: keep-all;
-}
-
-#app {
   max-width: 480px;
   margin: 0 auto;
   padding: 40px 16px 56px;
-  min-height: 100vh;
+  color: var(--ink);
+  font-family: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  font-size: 16px;
+  line-height: normal;
+  word-break: keep-all;
+  text-align: center;
 }
+.mbti :is(h1, h2, h3) { font-family: inherit; text-wrap: wrap; }
 
-.screen { text-align: center; }
-.screen[hidden], [hidden] { display: none !important; }
+.mbti .eyebrow { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
+.mbti h1 { font-size: 26px; margin: 0 0 12px; }
+.mbti h2 { white-space: pre-line; font-size: 21px; line-height: 1.45; margin: 8px 0 28px; min-height: 3em; }
+.mbti .lead { font-size: 16px; line-height: 1.6; margin: 0 0 28px; }
+.mbti .label { font-weight: 600; margin: 32px 0 12px; }
+.mbti .t-sub { color: #d77a92; font-weight: 600; margin: -4px 0 16px; }
 
-.eyebrow { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
-h1 { font-size: 26px; margin: 0 0 12px; }
-h2 { white-space: pre-line; font-size: 21px; line-height: 1.45; margin: 8px 0 28px; min-height: 3em; }
-.lead { font-size: 16px; line-height: 1.6; margin: 0 0 28px; }
-.label { font-weight: 600; margin: 32px 0 12px; }
-.sub { color: #d77a92; font-weight: 600; margin: -4px 0 16px; }
+.mbti .choices { display: grid; gap: 12px; }
 
-.choices { display: grid; gap: 12px; }
-
-.choice {
+.mbti .choice {
+  display: block;
   width: 100%;
   padding: 16px 18px;
   border: 1px solid var(--line);
@@ -47,29 +42,22 @@ h2 { white-space: pre-line; font-size: 21px; line-height: 1.45; margin: 8px 0 28
   font: inherit;
   font-size: 16px;
   line-height: 1.45;
+  text-decoration: none;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
 /* 터치 기기는 누른 자리에 hover 가 남으므로 마우스일 때만 적용한다 */
-@media (hover: hover) { .choice:hover { background: var(--pink-soft); border-color: var(--pink); } }
-.choice:focus-visible, .choice.selected { background: var(--pink-soft); border-color: var(--pink); outline: none; }
+@media (hover: hover) { .mbti .choice:hover { background: var(--pink-soft); border-color: var(--pink); } }
+.mbti .choice:focus-visible, .mbti .choice.selected { background: var(--pink-soft); border-color: var(--pink); outline: none; }
 
-.ghost {
-  margin-top: 24px;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
-}
+.mbti .t-ghost { margin-top: 24px; border: 0; background: none; color: var(--muted); font-size: 14px; cursor: pointer; }
+.mbti .nav { display: flex; justify-content: center; gap: 24px; }
 
-.nav { display: flex; justify-content: center; gap: 24px; }
-
-.progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 20px; }
+.mbti .progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 20px; }
 #bar { height: 100%; width: 0; background: var(--pink); transition: width 0.2s; }
 
-.frame {
+.mbti .frame {
+  position: relative;
   width: 100%;
   aspect-ratio: 12 / 13;
   max-width: 320px;
@@ -81,53 +69,56 @@ h2 { white-space: pre-line; font-size: 21px; line-height: 1.45; margin: 8px 0 28
   justify-content: center;
   overflow: hidden;
 }
-.frame img { width: 100%; height: 100%; object-fit: contain; }
+.mbti .frame img { width: 100%; height: 100%; object-fit: contain; }
 
-.card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  padding: 20px;
-  text-align: left;
-  margin-bottom: 24px;
-}
-.intro { font-weight: 600; margin: 0 0 12px; }
+.mbti .t-card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 20px; text-align: left; margin-bottom: 24px; }
+.mbti .intro { font-weight: 600; margin: 0 0 12px; }
+.mbti .t-card h3 { font-size: 15px; margin: 0 0 12px; color: #d77a92; }
+.mbti .t-card h3.gap { margin-top: 24px; }
+.mbti .desc { line-height: 1.75; margin: 0; }
 
-.card h3 { font-size: 15px; margin: 0 0 12px; color: #d77a92; }
-.card h3.gap { margin-top: 24px; }
-.desc { line-height: 1.75; margin: 0; }
+.mbti .bars { display: grid; gap: 10px; }
+.mbti .bar-row { display: grid; grid-template-columns: 6.5em 1fr 3em; align-items: center; gap: 10px; font-size: 14px; }
+.mbti .track { height: 10px; background: var(--pink-soft); border-radius: 5px; overflow: hidden; }
+.mbti .track div { height: 100%; background: var(--pink); border-radius: 5px; }
+.mbti .num { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-.bars { display: grid; gap: 10px; }
-.bar-row { display: grid; grid-template-columns: 6.5em 1fr 3em; align-items: center; gap: 10px; font-size: 14px; }
-.track { height: 10px; background: var(--pink-soft); border-radius: 5px; overflow: hidden; }
-.track div { height: 100%; background: var(--pink); border-radius: 5px; }
-.num { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
-
-.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-a.choice { display: block; text-decoration: none; }
-.kakao { margin-bottom: 12px; background: #fee500; border-color: #fee500; color: #191919; font-weight: 600; }
-.frame { position: relative; }
-.story {
+.mbti .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mbti .t-kakao { margin-bottom: 12px; background: #fee500; border-color: #fee500; color: #191919; font-weight: 600; }
+.mbti .t-kakao:hover, .mbti .t-kakao:focus-visible { background: #fdd800; border-color: #fdd800; }
+.mbti #keep-result { margin-bottom: 12px; font-weight: 600; }
+.mbti .story {
   position: absolute; right: 12px; bottom: 12px;
   width: 36px; height: 36px; padding: 0;
   border: 0; border-radius: 50%; overflow: hidden;
   background: none; cursor: pointer;
   box-shadow: 0 2px 8px rgba(74, 58, 58, 0.25);
 }
-.frame .story img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.story:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
-.kakao:hover, .kakao:focus-visible { background: #fdd800; border-color: #fdd800; }
+.mbti .frame .story img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.mbti .story:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
 
-.answers summary { cursor: pointer; font-size: 15px; font-weight: 600; color: #d77a92; }
-.answers ol { margin: 16px 0 0; padding-left: 20px; }
-.answers li + li { margin-top: 14px; }
-.answers p { margin: 0; line-height: 1.6; }
-.answers .q { color: var(--muted); font-size: 14px; }
-.answers .a { font-weight: 600; }
+.mbti .answers summary { cursor: pointer; font-size: 15px; font-weight: 600; color: #d77a92; }
+.mbti .answers ol { margin: 16px 0 0; padding-left: 20px; }
+.mbti .answers li + li { margin-top: 14px; }
+.mbti .answers p { margin: 0; line-height: 1.6; }
+.mbti .answers .q { color: var(--muted); font-size: 14px; }
+.mbti .answers .a { font-weight: 600; }
 
-/* 상단 바: 홈(../style.css .top)과 같은 모양 */
-.top { position: sticky; top: 0; z-index: 5; background: #fffefa; border-bottom: 1px solid #eae7dc; }
-.top-in { max-width: 1120px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; }
-.brand { font: 28px "Pinyon Script", cursive; color: #6d93bd; text-decoration: none; line-height: 1; }
-.top .iconbtn { display: grid; place-items: center; width: 36px; height: 36px; margin-left: auto; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #8a8d93; cursor: pointer; }
-.top .iconbtn:hover { background: rgb(0 0 0 / .06); }
+/* 캐릭터 모아 보기 */
+.mbti.chars { max-width: 720px; padding-bottom: 120px; }
+.mbti .cta { position: fixed; left: 0; right: 0; bottom: 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, var(--bg) 40%); }
+.mbti .cta .choice { max-width: 480px; margin: 0 auto; text-align: center; }
+.mbti .t-pair { margin-bottom: 32px; }
+.mbti .t-pair h2 { min-height: 0; margin: 0 0 12px; }
+.mbti .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mbti .cell { padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; cursor: pointer; }
+.mbti .cell .frame { margin: 0 0 6px; max-width: none; transition: transform 0.15s; }
+.mbti .cell:hover .frame, .mbti .cell:focus-visible .frame { transform: translateY(-3px); }
+
+.mbti dialog { width: calc(100% - 32px); max-width: 440px; max-height: 90vh; padding: 0; border: 0; border-radius: 24px; background: var(--bg); color: var(--ink); text-align: center; }
+.mbti .sheet { padding: 24px 20px 20px; }
+.mbti dialog .t-card { margin-bottom: 0; }
+.mbti dialog::backdrop { background: rgba(74, 58, 58, 0.45); }
+.mbti dialog .frame { max-width: 260px; }
+.mbti dialog h1 { margin-bottom: 8px; }
+.mbti .close { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--card); color: var(--muted); font-size: 20px; cursor: pointer; }

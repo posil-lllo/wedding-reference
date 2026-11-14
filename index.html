@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="mbti/style.css">
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-N1LGWGD5MF"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -25,12 +27,12 @@
 </head>
 <body data-view="home">
 <div class="top"><div class="top-in">
-  <button class="brand" data-view="home" aria-label="홈으로">Posil</button>
-  <div class="tabs" role="tablist">
-    <button class="tab" role="tab" aria-selected="false" data-view="edit">입력</button>
-    <button class="tab" role="tab" aria-selected="false" data-view="view">결과 미리보기</button>
+  <div class="top-l">
+    <button class="iconbtn menu-btn" popovertarget="main-menu" aria-label="메뉴"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <nav class="gnav" aria-label="주 메뉴"><button data-view="edit">내 시안</button><button data-view="checklist">체크리스트</button><button data-view="chars">성향 테스트</button></nav>
+    <nav class="help my-menu main-menu" id="main-menu" popover aria-label="주 메뉴"><button data-view="edit">내 시안</button><button data-view="checklist">체크리스트</button><button data-view="chars">성향 테스트</button><button data-view="invite">초대 코드 입력</button><button data-fb>문의하기</button></nav>
   </div>
-  <span class="status" id="status" role="status"></span><button class="info" id="save-info" popovertarget="save-help" aria-label="임시 저장 실패 안내" hidden>i</button>
+  <button class="brand" data-view="home" aria-label="홈으로">Posil</button>
   <div class="help" id="save-help" popover>
     <b>임시 저장이 안 된 상태예요</b>
     <p>입력한 내용은 서버가 아니라 이 기기의 브라우저 안에만 임시로 저장돼요. 브라우저가 저장을 거부하면 이 문구가 떠요.</p>
@@ -42,29 +44,42 @@
     </ul>
   </div>
   <div class="top-r">
-    <button class="iconbtn" popovertarget="toc" aria-label="목차"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r=".8"/><circle cx="4.5" cy="12" r=".8"/><circle cx="4.5" cy="18" r=".8"/></svg></button>
-    <nav class="help toc" id="toc" popover aria-label="목차"></nav>
     <button class="iconbtn" popovertarget="fb" aria-label="문의·피드백" title="문의·피드백"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 14v-2a7.5 7.5 0 0 1 15 0v2"/><rect x="3.5" y="13" width="4" height="5.5" rx="1.6"/><rect x="16.5" y="13" width="4" height="5.5" rx="1.6"/><path d="M18.5 18.5v.5a2.5 2.5 0 0 1-2.5 2.5h-2.5"/></svg></button>
     <div id="fb" popover role="dialog" aria-label="문의하기"></div><!-- 폼은 inquiry.js 가 그림 -->
     <button class="kakao" id="login-top" data-login><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="#000" d="M12 3C6.48 3 2 6.48 2 10.78c0 2.78 1.86 5.22 4.66 6.6l-.95 3.5c-.08.3.26.55.52.38l4.13-2.73c.54.07 1.08.1 1.64.1 5.52 0 10-3.48 10-7.85S17.52 3 12 3z"/></svg><span><span class="full">카카오 </span>로그인</span></button>
     <button class="iconbtn" id="my-btn" popovertarget="my-menu" aria-label="마이페이지" title="마이페이지" hidden><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg></button>
     <div class="help" id="login-ask" popover role="dialog" aria-label="로그인 안내">
-      <p>로그인하면 임시저장하고, 저장한 곳부터 이어서 할 수 있습니다.</p>
+      <p id="login-ask-msg">로그인하면 임시저장하고, 저장한 곳부터 이어서 할 수 있습니다.</p>
       <div class="crop-btns fb-btns"><button class="btn soft" popovertarget="login-ask" popovertargetaction="hide">그냥 하기</button><button class="kakao" data-login><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="#000" d="M12 3C6.48 3 2 6.48 2 10.78c0 2.78 1.86 5.22 4.66 6.6l-.95 3.5c-.08.3.26.55.52.38l4.13-2.73c.54.07 1.08.1 1.64.1 5.52 0 10-3.48 10-7.85S17.52 3 12 3z"/></svg>카카오 로그인</button></div>
       <button class="note ask-skip" data-skip-ask popovertarget="login-ask" popovertargetaction="hide">오늘 하루 보지 않기</button>
     </div>
-    <nav class="help my-menu" id="my-menu" popover aria-label="내 메뉴"><button data-view="my">마이페이지</button><button data-new-draft>새 시안 만들기</button><button data-fb>문의하기</button><button data-logout>로그아웃</button></nav>
+    <nav class="help my-menu" id="my-menu" popover aria-label="내 메뉴"><button data-view="my">마이페이지</button><button data-new-draft>새 시안 만들기</button><button data-view="invite">초대 코드 입력</button><button data-fb>문의하기</button><button data-logout>로그아웃</button></nav>
   </div>
+</div>
+<div class="top-sub">
+  <!-- 시안 제목 줄: 목차 · 제목 · 수정 + 입력/미리보기 를 한 줄로 (헤더가 두 겹으로 보이지 않게) -->
+  <div class="ed-head">
+    <button class="iconbtn" popovertarget="toc" aria-label="목차"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r=".8"/><circle cx="4.5" cy="12" r=".8"/><circle cx="4.5" cy="18" r=".8"/></svg></button>
+    <nav class="help toc" id="toc" popover aria-label="목차"></nav>
+    <div class="ed-title" id="ed-title" hidden><h1 id="ed-name"></h1><button class="btn pill" data-rename-cur>수정</button></div>
+  </div>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="false" data-view="edit">입력</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="view">결과 미리보기</button>
+  </div>
+  <span class="status" id="status" role="status"></span><button class="info" id="save-info" popovertarget="save-help" aria-label="임시 저장 실패 안내" hidden>i</button>
 </div></div>
 
 <main class="wrap home" id="view-home">
-  <a class="home-btn" href="mbti/characters.html">결혼준비<br>성향 테스트</a>
-  <button class="home-btn" data-view="edit">웨딩촬영<br>시안 만들기</button>
+  <div class="home-actions">
+    <button class="home-make" data-view="edit">웨딩촬영 시안 만들기</button>
+    <a class="home-test" href="#/chars">결혼준비 성향 테스트</a>
+  </div>
+  <section class="home-cal" id="home-cal" aria-label="내 일정"></section>
 </main>
 
 
 <main class="wrap" id="view-edit" hidden>
-  <div class="ed-title" id="ed-title" hidden><h1 id="ed-name"></h1><button class="btn pill" data-rename-cur>수정</button></div>
   <div class="editor" id="editor"></div>
 </main>
 
@@ -90,8 +105,126 @@
       <div class="profile-btns"><button class="btn" data-new-draft>+ 새 시안 만들기</button></div>
     </div>
   </section>
-  <h2 class="refs-h">레퍼런스 모음</h2>
-  <div class="refs" id="drafts"></div>
+  <div class="tabs my-tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" aria-controls="drafts">레퍼런스 모음</button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="invited">공유받은 시안</button>
+  </div>
+  <div class="refs" id="drafts" role="tabpanel"></div>
+  <div class="refs" id="invited" role="tabpanel" hidden></div>
+</main>
+
+<!-- 초대받은 시안: 링크(#/invite?c=코드)로 오면 바로 보이고, 코드만 받았으면 입력 -->
+<main class="wrap mypage" id="view-invite" hidden>
+  <form class="invite-enter" id="invite-form" hidden>
+    <h2 class="refs-h">초대 코드 입력</h2>
+    <p class="note">받은 초대 코드 8자리를 넣어 주세요. 로그인하지 않아도 볼 수 있어요.</p>
+    <div class="invite-row"><input class="in" name="code" maxlength="16" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="초대 코드" aria-describedby="invite-err" required><button class="btn">보기</button></div>
+    <p class="note err" id="invite-err" role="alert" hidden></p>
+  </form>
+  <section id="invite-preview" hidden>
+    <div class="shared-bar"><strong id="invite-who"></strong></div>
+    <div class="slides" id="invite-deck"></div>
+    <div class="edit-bar invite-keep" id="invite-keep" hidden><button class="btn" data-invite-login>보관하기</button></div>
+  </section>
+</main>
+
+<!-- 결혼 준비 체크리스트 (checklist/ 폴더의 스크립트를 씀) -->
+<main class="wrap checklist" id="view-checklist" hidden>
+  <section class="cl-hero">
+    <label class="cl-date">본식일 <input class="in" type="text" readonly data-pick="date" placeholder="날짜 선택" id="cl-wedding"></label>
+    <strong class="cl-dday" id="cl-dday"></strong>
+    <div class="cl-prog"><span class="note" id="cl-total"></span><div class="cl-bar"><i id="cl-bar"></i></div></div>
+    <button class="btn pill" id="cl-reset">처음 상태로</button>
+  </section>
+  <p class="note err" id="cl-err" role="alert" hidden>이 브라우저에 저장하지 못했어요. 개인정보 보호 모드나 앱 안 브라우저라면 일반 창에서 열어 주세요.</p>
+  <p class="note err" id="cl-sync-err" role="alert" hidden>계정에 저장하지 못했어요. 이 브라우저에는 저장돼 있고, 다음에 열 때 다시 올려요.</p>
+  <div class="cl-bar-row">
+    <div class="tabs" role="tablist" aria-label="보기 방식">
+      <button class="tab" role="tab" aria-selected="true" data-cl-mode="items">항목별</button>
+      <button class="tab" role="tab" aria-selected="false" data-cl-mode="checks">할 일만</button>
+    </div>
+    <label class="note cl-hide"><input type="checkbox" id="cl-hide-done"> 완료한 할 일 숨기기</label>
+          <button type="button" class="btn pill" id="cl-order-open">순서 편집</button>
+  </div>
+  <div id="cl-list"></div>
+</main>
+
+<!-- 성향 테스트 (mbti/ 폴더의 스크립트·그림을 씀) -->
+<main class="mbti" id="view-test" hidden>
+  <section id="start" class="screen">
+    <p class="eyebrow">결혼 준비 성향 테스트</p>
+    <h1>나는 어떤 예비부부일까?</h1>
+    <p class="lead">19개 질문으로 알아보는 나의 결혼 준비 캐릭터</p>
+    <p class="label">나는</p>
+    <div class="choices">
+      <button class="choice" data-gender="여자">신부</button>
+      <button class="choice" data-gender="남자">신랑</button>
+    </div>
+  </section>
+
+  <section id="quiz" class="screen" hidden>
+    <div class="progress"><div id="bar"></div></div>
+    <p id="count" class="eyebrow"></p>
+    <h2 id="question"></h2>
+    <div id="options" class="choices"></div>
+    <div class="nav">
+      <button id="back" class="t-ghost">이전 질문</button>
+      <button id="next" class="t-ghost">다음 질문</button>
+    </div>
+  </section>
+
+  <section id="result" class="screen" hidden>
+    <p class="eyebrow">나의 결혼 준비 캐릭터는</p>
+    <div class="frame">
+      <img id="char-img" alt="">
+      <button id="story" class="story" aria-label="인스타그램 스토리에 올리기" title="인스타그램 스토리에 올리기" hidden>
+        <img src="mbti/instagram.jpg" alt="">
+      </button>
+    </div>
+    <h1 id="char-name"></h1>
+    <p id="char-sub" class="t-sub"></p>
+    <p id="char-line" class="lead"></p>
+    <div class="t-card">
+      <h3>어떤 사람일까?</h3>
+      <p id="char-intro" class="intro"></p>
+      <p id="char-desc" class="desc"></p>
+    </div>
+    <div class="t-card">
+      <h3>결혼 준비에서 중요하게 여기는 것</h3>
+      <div id="value-bars" class="bars"></div>
+      <h3 class="gap">정하는 방식</h3>
+      <div id="style-bars" class="bars"></div>
+    </div>
+    <details class="t-card answers">
+      <summary>내가 고른 답변 보기</summary>
+      <ol id="answer-list"></ol>
+    </details>
+    <button id="share" class="choice t-kakao">카카오톡으로 공유하기</button>
+    <button id="keep-result" class="choice" data-keep-login>결과 보관하기</button>
+    <div class="actions">
+      <button class="choice" data-view="chars">다른 캐릭터 보러가기</button>
+      <button id="restart" class="choice">다시 하기</button>
+    </div>
+  </section>
+</main>
+
+<main class="mbti chars" id="view-chars" hidden>
+  <h1>결혼 준비 캐릭터</h1>
+  <div id="list"></div>
+  <div class="cta"><button class="choice" data-view="test">나도 테스트하기</button></div>
+  <dialog id="detail">
+    <div class="sheet">
+    <button class="close" aria-label="닫기">×</button>
+    <div class="frame"><img id="d-img" alt=""></div>
+    <h1 id="d-name"></h1>
+    <p id="d-line" class="lead"></p>
+    <div class="t-card">
+      <h3>어떤 사람일까?</h3>
+      <p id="d-intro" class="intro"></p>
+      <p id="d-desc" class="desc"></p>
+    </div>
+    </div>
+  </dialog>
 </main>
 
 <dialog class="crop onboard" id="profile" aria-labelledby="profile-h">
@@ -124,6 +257,27 @@
     <div class="crop-btns"><span id="crop-count"></span><button class="btn soft" value="cancel" id="crop-skip">빼기</button><button class="btn soft" value="prev" id="crop-prev">이전</button><button class="btn" value="ok" id="crop-ok" autofocus>확인</button></div>
   </form>
 </dialog>
+<dialog class="crop" id="join" aria-labelledby="join-h">
+  <form class="join-form" id="join-form">
+    <div class="crop-top"><p class="crop-h" id="join-h">초대 코드 입력</p><button type="button" class="crop-x" id="join-x" aria-label="닫기">✕</button></div>
+    <p class="note">받은 초대 코드 8자리를 넣으면 공유받은 시안에 추가돼요.</p>
+    <div class="invite-row"><input class="in" name="code" maxlength="16" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="초대 코드" aria-describedby="join-err" required><button class="btn">불러오기</button></div>
+    <p class="note err" id="join-err" role="alert" hidden></p>
+  </form>
+</dialog>
+<dialog class="crop invite-dlg" id="invite" aria-labelledby="invite-h">
+  <div class="crop-top"><p class="crop-h" id="invite-h">시안 초대하기</p><button type="button" class="crop-x" id="invite-x" aria-label="닫기">✕</button></div>
+  <p class="note">링크나 QR, 초대 코드를 받은 사람은 로그인하지 않아도 이 시안을 볼 수 있어요. 고칠 수는 없고, 내가 고친 내용은 바로 보여요. 신랑·신부 이름과 촬영일도 함께 보여요.</p>
+  <div class="invite-qr" id="invite-qr"></div>
+  <p class="invite-code">초대 코드 <strong id="invite-code"></strong></p>
+  <div class="crop-btns"><button class="btn soft" id="invite-off">초대 끊기</button><button class="btn soft" id="invite-copy">링크 복사</button><button class="btn" id="invite-send" hidden>보내기</button></div>
+</dialog>
+<dialog class="crop cl-order" id="cl-order" aria-labelledby="cl-order-h">
+  <div class="crop-top"><p class="crop-h" id="cl-order-h">순서 편집</p><button type="button" class="crop-x" id="cl-order-x" aria-label="닫기">✕</button></div>
+  <p class="note">⠿ 를 끌어서 옮겨요.</p>
+  <div class="cl-order-list" id="cl-order-list"></div>
+  <div class="crop-btns"><button type="button" class="btn soft" id="cl-order-reset">순서 초기화</button></div>
+</dialog>
 <div class="overlay" id="overlay" hidden>PDF 만드는 중…</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -132,8 +286,18 @@
 <script src="slides.js"></script>
 <script src="app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="datepick.js"></script>
 <script src="account.js"></script>
+<script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.6/kakao.min.js" integrity="sha384-WAtVcQYcmTO/N+C1N+1m6Gp8qxh+3NlnP7X1U7qP6P5dQY/MsRBNTh+e1ahJrkEm" crossorigin="anonymous"></script>
+<script src="mbti/data.js"></script>
+<script src="mbti/logic.js"></script>
+<script src="mbti/story.js"></script>
+<script src="mbti/app.js"></script>
+<script src="mbti/chars.js"></script>
+<script src="checklist/data.js"></script>
+<script src="checklist/app.js"></script>
+<script src="home-cal.js"></script>
   <script src="inquiry.js"></script>
 </body>
 </html>

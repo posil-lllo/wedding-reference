@@ -124,7 +124,11 @@
   };
 
   pop.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') pop.hidePopover();
+    if (e.key !== 'Escape') return;
+    pop.hidePopover();
+    // 연 버튼으로 포커스를 돌림. 좁은 화면에서는 문의 버튼이 닫힌 메뉴 안에 있어 메뉴 버튼으로
+    const opener = [...document.querySelectorAll('[popovertarget="fb"]')].find((b) => b.offsetParent);
+    (opener || document.querySelector('.menu-btn'))?.focus();
   });
   pop.addEventListener('toggle', (e) => {
     if (e.newState === 'open') {

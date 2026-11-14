@@ -80,6 +80,9 @@ function update(path, v) {
   state = setIn(state, toPath(path), v);
   scheduleSave();
 }
+// 체크리스트 '웨딩촬영' 항목에서 날짜를 고치고 시안에도 넣기로 했을 때 (checklist/app.js)
+window.shootDate = () => state.basic.date;
+window.setShootDate = (d) => { update('basic.date', d); renderEditor(); };
 
 // ── IndexedDB 저장 ──
 // iOS Safari 는 앱 전환 뒤 연결이 끊기는 일이 있어, 실패하면 새로 열어 한 번 더 시도
@@ -392,8 +395,10 @@ async function addImages(input) {
 }
 
 // ── 입력 화면 마크업 ──
+// 날짜·시간은 datepick.js 의 공용 팝업으로 고름
+const PICK = { date: '날짜 선택', time: '시간 선택' };
 const input = (path, label, type = 'text', extra = '') =>
-  `<label class="f"><span>${label}</span><input class="in" type="${type}" data-path="${path}" value="${esc(get(path))}" ${extra}></label>`;
+  `<label class="f"><span>${label}</span><input class="in" ${PICK[type] ? `type="text" readonly data-pick="${type}" placeholder="${PICK[type]}"` : `type="${type}"`} data-path="${path}" value="${esc(get(path))}" ${extra}></label>`;
 const area = (path, label) => `<label class="f">${label}<textarea class="in" data-path="${path}">${esc(get(path))}</textarea></label>`;
 const bare = (path, ph) => `<input class="in" data-path="${path}" value="${esc(get(path))}" placeholder="${ph}" aria-label="${ph}">`;
 const addBtn = (path) =>
@@ -578,11 +583,13 @@ pointHex.addEventListener('blur', () => {
 // ── 탭 · 결과 ──
 const deckEl = document.getElementById('deck');
 // 화면마다 주소(#/edit 등)를 달리 둬서 새로고침·뒤로 가기에도 그 화면이 유지됨
-const VIEWS = ['home', 'edit', 'view', 'my'];
-// 성향 테스트는 mbti/ 로 옮김. 예전 #/mbti 주소로 들어오면 넘겨 줌
-if (location.hash === '#/mbti') location.replace('mbti/');
+const VIEWS = ['home', 'edit', 'view', 'my', 'test', 'chars', 'invite', 'checklist'];
+const LOGIN_VIEWS = ['my']; // 로그인해야 보이는 화면. 로그인 확인 뒤 account.js 가 띄움
+// 예전 성향 테스트 주소(#/mbti)로 들어오면 #/test 로
+const fixOldHash = () => { if (location.hash === '#/mbti') history.replaceState(null, '', '#/test'); };
+fixOldHash();
 const viewFromHash = () => {
-  const v = location.hash.slice(2);
+  const v = location.hash.slice(2).split('?')[0]; // #/chars?c=..&g=.. 처럼 뒤에 값이 붙을 수 있음
   return VIEWS.includes(v) ? v : 'home';
 };
 const urlOf = (view) => (view === 'home' ? location.pathname + location.search : `#/${view}`);
@@ -593,15 +600,20 @@ function show(view) {
 function renderView(view) {
   document.body.dataset.view = view;
   VIEWS.forEach((v) => { document.getElementById(`view-${v}`).hidden = v !== view; });
-  document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.view === view)));
+  document.querySelectorAll('.tab[data-view]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.view === view)));
   if (view === 'view') deckEl.innerHTML = renderDeck(withoutBlanks(state));
   if (view === 'my') renderMyPage(); // account.js
-  if (view === 'edit') window.askLogin?.(); // account.js. 처음 열 때는 아직 안 불렸을 수 있고, 그때는 account.js 가 로그인 확인 뒤 부름
+  if (view === 'chars') window.openSharedChar?.(); // mbti/chars.js
+  if (view === 'checklist') window.renderChecklist?.(); // checklist/app.js
+  if (view === 'home') window.renderHomeCal?.(); // home-cal.js
+  if (view === 'invite') window.renderInvite?.(); // account.js. 처음 열 때는 아직 없을 수 있고, 그때는 account.js 가 로그인 확인 뒤 부름
+  if (view === 'edit' || view === 'checklist') window.askLogin?.(); // account.js. 처음 열 때는 아직 안 불렸을 수 있고, 그때는 account.js 가 로그인 확인 뒤 부름
   scrollTo(0, 0);
 }
 addEventListener('popstate', () => {
+  fixOldHash(); // 앱 안에서 주소를 #/mbti 로 바꾼 경우
   const v = viewFromHash();
-  if (v === 'my' && !user) { // 로그아웃 뒤 마이페이지로 돌아온 경우 (user 는 account.js)
+  if (LOGIN_VIEWS.includes(v) && !user) { // 로그아웃 뒤 마이페이지 등으로 돌아온 경우 (user 는 account.js)
     history.replaceState(null, '', urlOf('home'));
     return renderView('home');
   }
@@ -688,5 +700,5 @@ const ready = (async () => {
   }
   applyPointColor(state.pointColor);
   renderEditor();
-  if (viewFromHash() !== 'my') renderView(viewFromHash()); // 마이페이지는 로그인 확인 뒤 account.js 가 띄움
+  if (!LOGIN_VIEWS.includes(viewFromHash())) renderView(viewFromHash()); // 마이페이지 등은 로그인 확인 뒤 account.js 가 띄움
 })();

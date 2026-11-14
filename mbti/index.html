@@ -9,87 +9,10 @@
   <meta property="og:title" content="나는 어떤 예비부부일까?">
   <meta property="og:description" content="19개 질문으로 알아보는 나의 결혼 준비 캐릭터">
   <meta property="og:image" content="https://posil-lllo.github.io/wedding-reference/mbti/%EC%84%9C%EC%9E%88%EB%8A%94%EB%AA%A8%EC%8A%B5/%EC%A4%80%EB%B9%84%20%EA%B8%B0%EB%A1%9D%EA%B0%80%ED%98%95-%EC%97%AC%EC%9E%90.png">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pinyon+Script&text=Posil&display=swap">
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-N1LGWGD5MF"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    // 웨딩 레퍼런스와 같은 속성. ?notrack 으로 한 번 들어온 브라우저는 빠짐 (../index.html 과 같은 키)
-    try { window['ga-disable-G-N1LGWGD5MF'] = localStorage.getItem('wr-notrack') === '1'; } catch (e) {}
-    gtag('js', new Date());
-    gtag('config', 'G-N1LGWGD5MF');
-  </script>
+  <!-- 성향 테스트는 홈(../index.html)의 #/test 화면으로 옮김. 예전 공유 링크·미리보기(og)용으로 남겨 둔 주소 -->
+  <script>location.replace("../#/test" + "");</script>
 </head>
 <body>
-  <!-- 홈(../index.html)과 같은 상단 바. 로그인·마이페이지는 홈에만 있음 -->
-  <header class="top"><div class="top-in">
-    <a class="brand" href="../" aria-label="Posil 홈으로">Posil</a>
-    <button class="iconbtn" popovertarget="fb" aria-label="문의·피드백" title="문의·피드백"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 14v-2a7.5 7.5 0 0 1 15 0v2"/><rect x="3.5" y="13" width="4" height="5.5" rx="1.6"/><rect x="16.5" y="13" width="4" height="5.5" rx="1.6"/><path d="M18.5 18.5v.5a2.5 2.5 0 0 1-2.5 2.5h-2.5"/></svg></button>
-    <div id="fb" popover role="dialog" aria-label="문의하기"></div><!-- 폼은 inquiry.js 가 그림 -->
-  </div></header>
-  <main id="app">
-    <section id="start" class="screen">
-      <p class="eyebrow">결혼 준비 성향 테스트</p>
-      <h1>나는 어떤 예비부부일까?</h1>
-      <p class="lead">19개 질문으로 알아보는 나의 결혼 준비 캐릭터</p>
-      <p class="label">나는</p>
-      <div class="choices">
-        <button class="choice" data-gender="여자">신부</button>
-        <button class="choice" data-gender="남자">신랑</button>
-      </div>
-    </section>
-
-    <section id="quiz" class="screen" hidden>
-      <div class="progress"><div id="bar"></div></div>
-      <p id="count" class="eyebrow"></p>
-      <h2 id="question"></h2>
-      <div id="options" class="choices"></div>
-      <div class="nav">
-        <button id="back" class="ghost">이전 질문</button>
-        <button id="next" class="ghost">다음 질문</button>
-      </div>
-    </section>
-
-    <section id="result" class="screen" hidden>
-      <p class="eyebrow">나의 결혼 준비 캐릭터는</p>
-      <div class="frame">
-        <img id="char-img" alt="">
-        <button id="story" class="story" aria-label="인스타그램 스토리에 올리기" title="인스타그램 스토리에 올리기" hidden>
-          <img src="instagram.jpg" alt="">
-        </button>
-      </div>
-      <h1 id="char-name"></h1>
-      <p id="char-sub" class="sub"></p>
-      <p id="char-line" class="lead"></p>
-      <div class="card">
-        <h3>어떤 사람일까?</h3>
-        <p id="char-intro" class="intro"></p>
-        <p id="char-desc" class="desc"></p>
-      </div>
-      <div class="card">
-        <h3>결혼 준비에서 중요하게 여기는 것</h3>
-        <div id="value-bars" class="bars"></div>
-        <h3 class="gap">정하는 방식</h3>
-        <div id="style-bars" class="bars"></div>
-      </div>
-      <details class="card answers">
-        <summary>내가 고른 답변 보기</summary>
-        <ol id="answer-list"></ol>
-      </details>
-      <button id="share" class="choice kakao">카카오톡으로 공유하기</button>
-      <div class="actions">
-        <a class="choice" href="characters.html">다른 캐릭터 보러가기</a>
-        <button id="restart" class="choice">다시 하기</button>
-      </div>
-    </section>
-  </main>
-  <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.6/kakao.min.js" integrity="sha384-WAtVcQYcmTO/N+C1N+1m6Gp8qxh+3NlnP7X1U7qP6P5dQY/MsRBNTh+e1ahJrkEm" crossorigin="anonymous"></script>
-  <script src="data.js"></script>
-  <script src="logic.js"></script>
-  <script src="story.js"></script>
-  <script src="app.js"></script>
-  <script src="../inquiry.js"></script>
+  <p><a href="../#/test">웨딩 성향 테스트 열기</a></p>
 </body>
 </html>

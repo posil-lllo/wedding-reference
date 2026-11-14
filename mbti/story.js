@@ -22,7 +22,7 @@ function wrapLines(ctx, text, maxWidth) {
 
 async function makeStoryFile(c, gender) {
   const img = new Image();
-  img.src = encodeURI(`서있는모습/${c.image}-${gender}.png`);
+  img.src = encodeURI(`mbti/서있는모습/${c.image}-${gender}.png`);
   await img.decode();
 
   const canvas = document.createElement("canvas");

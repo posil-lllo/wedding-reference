@@ -8,6 +8,8 @@ const BUCKET = 'photos';
 const LOGIN_FLAG = 'wr-login';
 const ASKED_FLAG = 'wr-login-asked';
 const SKIP_DAY = 'wr-login-ask-skip'; // '오늘 하루 보지 않기' 누른 날짜
+const KEEP_FLAG = 'wr-keep-test'; // 테스트 결과 화면에서 로그인을 누른 경우, 돌아와서 그 결과를 저장
+const INVITE_FLAG = 'wr-invite'; // 초대 화면에서 로그인을 누른 경우, 카카오에서 돌아와 다시 열 초대 코드
 const MAX_DRAFTS = 2; // 서버 용량 때문에 계정당 시안 수 제한
 const must = ({ data, error }) => {
   if (error) throw error;
@@ -41,7 +43,9 @@ async function upload(uid, url) {
 }
 const toRemote = (uid, data) => mapStrings(data, async (s) => {
   if (!s.startsWith('data:image')) return s;
-  if (!pathOf.has(s)) pathOf.set(s, upload(uid, s).catch((e) => { pathOf.delete(s); throw e; }));
+  // 남의 시안(초대)에서 받은 사진은 그 사람 폴더 경로가 캐시돼 있으므로 내 폴더로 다시 올림
+  const isMine = pathOf.has(s) && (await pathOf.get(s).catch(() => '')).startsWith(`${uid}/`);
+  if (!isMine) pathOf.set(s, upload(uid, s).catch((e) => { pathOf.delete(s); throw e; }));
   return `sb:${await pathOf.get(s)}`;
 });
 const toLocal = (data) => mapStrings(data, async (s) => {
@@ -56,9 +60,13 @@ const toLocal = (data) => mapStrings(data, async (s) => {
 });
 
 const COLS = 'id,name,updated_at,data';
+// 초대 코드 8자리. 헷갈리는 I O 0 1 을 뺀 32자 (schema.sql invites.code 검사와 같게)
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const newCode = () => [...crypto.getRandomValues(new Uint8Array(8))].map((b) => CODE_CHARS[b & 31]).join('');
 const fromRow = (r) => ({ id: r.id, name: r.name, updatedAt: Date.parse(r.updated_at), data: r.data });
+// 초대 링크로 들어와 익명 로그인한 사람은 로그인하지 않은 것으로 봄
 const toUser = (session) => {
-  if (!session) return null;
+  if (!session || session.user.is_anonymous) return null;
   const m = session.user.user_metadata || {};
   return { id: session.user.id, name: m.name || m.full_name || m.nickname || '이름 없음', avatar: m.avatar_url || m.picture };
 };
@@ -90,6 +98,26 @@ const backend = {
     const orphans = [...new Set(photoPaths(all.find((d) => d.id === id)?.data))].filter((p) => !kept.has(p));
     if (orphans.length) must(await sb.storage.from(BUCKET).remove(orphans));
   },
+  // 초대: 시안 하나를 보기만 하게 링크·QR·코드로 보냄. 시안마다 하나, 끊고 다시 만들면 새 코드
+  invite: async (id) => must(await sb.from('invites').select('code').eq('draft_id', id).maybeSingle())?.code,
+  createInvite: async (uid, id) => must(await sb.from('invites').insert({ code: newCode(), user_id: uid, draft_id: id }).select('code').single()).code,
+  revokeInvite: async (id) => must(await sb.from('invites').delete().eq('draft_id', id)),
+  // 로그인하지 않았으면 익명 로그인부터. 그래야 서버가 이 사람에게 초대받은 시안의 사진을 열어 줌
+  joinInvite: async (code) => {
+    if (!must(await sb.auth.getSession()).session) must(await sb.auth.signInAnonymously());
+    return must(await sb.rpc('join_invite', { c: code }))[0];
+  },
+  invitedList: async () => must(await sb.rpc('invited_drafts')),
+  // 체크리스트는 계정당 하나
+  checklist: async () => must(await sb.from('checklists').select('data').maybeSingle())?.data,
+  putChecklist: async (uid, s) => must(await sb.from('checklists').upsert({ user_id: uid, data: s, updated_at: new Date(s.at).toISOString() })),
+  // 성향 테스트 결과는 한 번 할 때마다 쌓고, 최신 캐릭터는 프로필에도 적음 (프로필이 아직 없으면 update 는 아무 일 안 함)
+  saveTestResult: async (uid, r) => {
+    must(await sb.from('test_results').insert({
+      character: r.key, value: r.value, gender: r.gender, answers: r.answers, value_percent: r.valuePercent, style_percent: r.stylePercent,
+    }));
+    must(await sb.from('profiles').update({ character: r.key }).eq('user_id', uid));
+  },
   // 마이페이지 카드용 1시간짜리 서명 URL
   signedUrls: async (paths) => (paths.length
     ? Object.fromEntries(must(await sb.storage.from(BUCKET).createSignedUrls(paths, 3600)).map((x) => [x.path, x.signedUrl]))
@@ -97,6 +125,36 @@ const backend = {
 };
 
 let user = null;
+
+// 체크리스트(checklist/app.js)는 고칠 때마다 브라우저에 저장하고, 로그인했으면 1초 모아 계정에도 저장
+// 못 올린 것은 브라우저에 남아 있다가, 다음에 열 때 브라우저 쪽이 더 나중에 고친 것이라 다시 올라감
+let clTimer;
+const clSyncErr = (on) => { document.getElementById('cl-sync-err').hidden = !on; };
+window.pushChecklist = (s) => {
+  if (!user) return;
+  clearTimeout(clTimer);
+  clTimer = setTimeout(() => backend.putChecklist(user.id, s).then(() => clSyncErr(false), (e) => {
+    console.error('checklist sync failed', e);
+    clSyncErr(true);
+  }), 1000);
+};
+// 로그인 확인 뒤 한 번: 브라우저와 계정 중 나중에 고친 쪽으로 맞춤
+// ponytail: 통째로 하나를 고름. 두 기기에서 동시에 고치면 먼저 고친 쪽이 사라짐, 그게 문제면 할 일 단위로 합칠 것
+async function syncChecklist() {
+  const sync = window.checklistSync;
+  if (!user || !sync) return;
+  const local = sync.get();
+  const remote = await backend.checklist();
+  if (remote && (remote.at || 0) > (local.at || 0)) { sync.set(remote); refreshDates(); }
+  else if ((local.at || 0) > (remote?.at || 0)) await backend.putChecklist(user.id, local);
+}
+// mbti/app.js 가 테스트를 끝낸 순간 부름. 카카오 로그인한 사람만 저장 (익명·비로그인은 user 가 null)
+window.saveTestResult = (r) => {
+  if (!user) return;
+  backend.saveTestResult(user.id, r)
+    .then(() => { if (profile) profile = { ...profile, character: r.key }; })
+    .catch((e) => console.error('성향 테스트 결과 저장 실패', e));
+};
 let profile = null; // profiles 테이블의 내 행 { nickname, role, character }
 let draftId = null;
 // syncedAt: 이 브라우저가 마지막으로 불러오거나 저장한 서버 시각. 서버 값과 다르면 다른 창·기기가 그 뒤에 저장한 것
@@ -176,6 +234,7 @@ const draftsEl = document.getElementById('drafts');
 function renderAuth() {
   loginTop.hidden = Boolean(user);
   loginCta.hidden = Boolean(user);
+  document.getElementById('keep-result').hidden = Boolean(user);
   myBtn.hidden = !user;
   document.body.classList.toggle('authed', Boolean(user));
 }
@@ -191,7 +250,7 @@ const draftCard = (d, img) => {
     <button class="dcard-img" data-open="${esc(d.id)}" aria-label="${esc(d.name)} 이어서 작업">${img ? `<img src="${esc(img)}" alt="">` : '<span>사진 없음</span>'}${isCur ? '<em>작업 중</em>' : ''}</button>
     <p class="dcard-name">${esc(d.name)}</p>
     <div class="dcard-f"><small>${fmtSaved(d.updatedAt)}</small><button class="iconbtn" popovertarget="dm-${esc(d.id)}" aria-label="시안 메뉴">${KEBAB}</button></div>
-    <nav class="help my-menu" id="dm-${esc(d.id)}" popover aria-label="시안 메뉴"><button data-rename="${esc(d.id)}">이름 수정</button>${isCur ? '' : `<button data-rm="${esc(d.id)}">시안 삭제</button>`}</nav>
+    <nav class="help my-menu" id="dm-${esc(d.id)}" popover aria-label="시안 메뉴"><button data-rename="${esc(d.id)}">이름 수정</button><button data-invite="${esc(d.id)}">초대하기</button>${isCur ? '' : `<button data-rm="${esc(d.id)}">시안 삭제</button>`}</nav>
   </article>`;
 };
 
@@ -200,30 +259,186 @@ const LEAF = 'M50 47C35 37 29 20 38 13C45 8 50 14 50 19C50 14 55 8 62 13C71 20 6
 const DEFAULT_AVATAR = `<svg class="avatar-def" viewBox="0 0 100 100" aria-hidden="true">${[45, 135, 225, 315]
   .map((r) => `<path d="${LEAF}" transform="rotate(${r} 50 50)"/>`).join('')}<path class="stem" d="M50 52q1 22 16 40"/></svg>`;
 
+const invitedEl = document.getElementById('invited');
+const invitedCard = (x, img) => `<article class="dcard">
+    <button class="dcard-img" data-invited="${esc(x.code)}" aria-label="${esc(x.nickname || '익명')}님의 시안 보기">${img ? `<img src="${esc(img)}" alt="">` : '<span>사진 없음</span>'}</button>
+    <p class="dcard-name">${esc(x.name || '이름 없는 시안')}</p>
+    <div class="dcard-f"><small>${esc(x.nickname || '익명')}님 · ${fmtSaved(Date.parse(x.updated_at))} 수정</small></div>
+  </article>`;
+
+// 공유받은 시안 끝에 늘 붙는 카드. 눌러서 초대 코드를 넣으면 목록에 추가됨 (받는 초대 수는 제한 없음)
+const JOIN_CARD = `<article class="dcard">
+    <button class="dcard-img dcard-add" data-join aria-label="초대 코드 입력">+</button>
+    <p class="dcard-name">초대 코드 입력</p>
+    <div class="dcard-f"><small>받은 코드로 시안 추가</small></div>
+  </article>`;
+
 // app.js 의 show('my') 가 부름
 async function renderMyPage() {
-  const list = await backend.list();
-  const covers = await backend.signedUrls([...new Set(list.map((d) => photoPaths(d.data)[0]).filter(Boolean))]);
+  const [list, invited] = await Promise.all([backend.list(), backend.invitedList()]);
+  setDraftDates(list); // 삭제·이름 변경 뒤에도 여기를 지남
+  const covers = await backend.signedUrls([...new Set([...list, ...invited].map((d) => photoPaths(d.data)[0]).filter(Boolean))]);
   document.getElementById('my-avatar').innerHTML = user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : DEFAULT_AVATAR;
   showProfile();
   draftsEl.innerHTML = list.map((d) => draftCard(d, covers[photoPaths(d.data)[0]])).join('') || '<p class="note">저장된 시안이 없어요</p>';
+  invitedEl.innerHTML = invited.map((x) => invitedCard(x, covers[photoPaths(x.data)[0]])).join('') + JOIN_CARD;
 }
+// 마이페이지 탭: 레퍼런스 모음 / 공유받은 시안
+const myTabs = document.querySelector('.my-tabs');
+myTabs.addEventListener('click', (e) => {
+  const t = e.target.closest('[role=tab]');
+  if (!t) return;
+  myTabs.querySelectorAll('[role=tab]').forEach((b) => {
+    b.setAttribute('aria-selected', b === t);
+    document.getElementById(b.getAttribute('aria-controls')).hidden = b !== t;
+  });
+});
+const joinDlg = document.getElementById('join');
+const joinForm = document.getElementById('join-form');
+const joinErr = document.getElementById('join-err');
+const showJoinErr = (msg) => { joinErr.textContent = msg; joinErr.hidden = false; };
+invitedEl.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-invited]');
+  if (b) openInviteView(b.dataset.invited);
+  else if (e.target.closest('[data-join]')) {
+    joinForm.reset();
+    joinErr.hidden = true;
+    joinDlg.showModal();
+  }
+});
+document.getElementById('join-x').addEventListener('click', () => joinDlg.close());
+joinForm.addEventListener('input', () => { joinErr.hidden = true; }); // 비우고 내면 required 가 막아 submit 이 안 불리므로 고칠 때 지움
+joinForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const code = joinForm.code.value.trim().toUpperCase();
+  joinErr.hidden = true;
+  try {
+    await backend.joinInvite(code);
+  } catch (err) {
+    const notFound = /invite not found/.test(err.message);
+    if (!notFound) console.error('join invite failed', err);
+    showJoinErr(notFound ? '초대를 찾지 못했어요. 코드를 다시 확인해 주세요.' : '불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+    return;
+  }
+  await renderMyPage();
+  // 내 시안의 코드는 서버가 받은 사람으로 기록하지 않아 목록에 안 생김
+  if (!invitedEl.querySelector(`[data-invited="${code}"]`)) return showJoinErr('내 시안의 초대 코드예요. 레퍼런스 모음에서 볼 수 있어요.');
+  joinDlg.close();
+  track('join_invite');
+});
 
-// 비로그인으로 시안 화면에 처음 들어오면 탭마다 한 번 로그인 권유. 로그인 상태를 확인하기 전이면 확인한 뒤에 띄움
+// ── 초대 (보내는 쪽): 시안 메뉴의 '초대하기' → 링크·QR·코드 창 ──
+const inviteDlg = document.getElementById('invite');
+const inviteLink = (code) => `${location.origin}${location.pathname}#/invite?c=${code}`;
+let inviting = null; // 창에 띄운 { id, code }
+async function openInvite(id) {
+  try {
+    const code = (await backend.invite(id)) || (await backend.createInvite(user.id, id));
+    inviting = { id, code };
+    const qr = qrcode(0, 'M');
+    qr.addData(inviteLink(code));
+    qr.make();
+    document.getElementById('invite-qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true, alt: '초대 링크 QR 코드' });
+    document.getElementById('invite-code').textContent = code;
+    document.getElementById('invite-send').hidden = !navigator.share;
+    inviteDlg.showModal();
+    track('open_invite');
+  } catch (err) {
+    console.error('open invite failed', err);
+    alert('초대 링크를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+  }
+}
+document.getElementById('invite-x').addEventListener('click', () => inviteDlg.close());
+document.getElementById('invite-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(inviteLink(inviting.code));
+    alert('링크를 복사했어요.');
+    track('copy_invite');
+  } catch {
+    prompt('이 링크를 복사해 보내 주세요.', inviteLink(inviting.code)); // 클립보드 권한이 없는 브라우저
+  }
+});
+document.getElementById('invite-send').addEventListener('click', () => {
+  navigator.share({ title: '웨딩 촬영 시안', text: `초대 코드 ${inviting.code}`, url: inviteLink(inviting.code) })
+    .then(() => track('send_invite'))
+    .catch((e) => { if (e.name !== 'AbortError') console.error('share invite failed', e); });
+});
+document.getElementById('invite-off').addEventListener('click', async () => {
+  if (!confirm('초대를 끊을까요?\n지금 링크와 코드로는 더 볼 수 없어요. 다시 초대하면 새 링크가 만들어져요.')) return;
+  try {
+    await backend.revokeInvite(inviting.id);
+    inviteDlg.close();
+    track('revoke_invite');
+  } catch (err) {
+    console.error('revoke invite failed', err);
+    alert('초대를 끊지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+  }
+});
+
+// ── 초대 (받는 쪽): #/invite?c=코드. 코드가 없거나 틀리면 입력 칸 ──
+const inviteForm = document.getElementById('invite-form');
+const inviteErr = document.getElementById('invite-err');
+const invitePreview = document.getElementById('invite-preview');
+const inviteCode = () => new URLSearchParams(location.hash.split('?')[1]).get('c')?.trim().toUpperCase() || '';
+function openInviteView(code) {
+  history.pushState(null, '', `#/invite?c=${encodeURIComponent(code)}`);
+  renderView('invite');
+}
+// app.js 의 show('invite') 가 부름. 익명 로그인이 세션 복원과 겹치지 않게 로그인 확인 뒤에만
+async function renderInvite() {
+  if (!authChecked) return;
+  const code = inviteCode();
+  inviteForm.hidden = Boolean(code);
+  invitePreview.hidden = true;
+  inviteErr.hidden = true;
+  if (!code) return;
+  setStatus('시안 불러오는 중…');
+  try {
+    const x = await backend.joinInvite(code);
+    const data = await toLocal(x.data);
+    if (inviteCode() !== code) return; // 불러오는 사이 다른 화면으로 감
+    document.getElementById('invite-who').textContent = `${x.nickname || '익명'}님이 초대한 시안 · ${x.name || '이름 없는 시안'}`;
+    document.getElementById('invite-deck').innerHTML = renderDeck(withoutBlanks(restore(data)));
+    document.getElementById('invite-keep').hidden = Boolean(user);
+    invitePreview.hidden = false;
+    setStatus('');
+    track('view_invite', { member: Boolean(user) });
+  } catch (err) {
+    const notFound = /invite not found/.test(err.message);
+    if (!notFound) console.error('open invite failed', err);
+    setStatus('');
+    inviteForm.hidden = false;
+    inviteForm.code.value = code;
+    inviteErr.textContent = notFound ? '초대를 찾지 못했어요. 코드를 다시 확인하거나 보낸 분께 새 링크를 받아 주세요.' : '불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.';
+    inviteErr.hidden = false;
+  }
+}
+inviteForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  openInviteView(inviteForm.code.value.trim().toUpperCase());
+});
+
+// 비로그인으로 시안·체크리스트 화면에 처음 들어오면 탭마다 한 번 로그인 권유. 로그인 상태를 확인하기 전이면 확인한 뒤에 띄움
+const ASK_MSG = {
+  edit: '로그인하면 임시저장하고, 저장한 곳부터 이어서 할 수 있습니다.',
+  checklist: '로그인하면 체크리스트와 메모를 계정에 저장해 다른 기기에서도 이어서 볼 수 있어요.',
+};
 let authChecked = false;
 function askLogin() {
   if (!authChecked || user || sessionStorage.getItem(ASKED_FLAG)) return;
   if (localStorage.getItem(SKIP_DAY) === new Date().toDateString()) return;
   sessionStorage.setItem(ASKED_FLAG, '1');
+  document.getElementById('login-ask-msg').textContent = ASK_MSG[viewFromHash()] || ASK_MSG.edit;
   document.getElementById('login-ask').showPopover();
 }
 
 // 카카오에서 돌아온 직후 한 번: 비로그인으로 작업하던 내용이 있으면 새 시안으로 저장, 없으면 마지막 시안을 이어서
 // 시안이 이미 꽉 찼으면 작업 내용은 이 기기에만 두고 안내 팝업 없이 넘어감 (덮어쓰지 않음)
-async function afterLogin() {
+// view 가 null 이면 지금 화면(테스트 결과 등)을 그대로 둠
+async function afterLogin(view = 'edit') {
   const list = await backend.list();
   if (!hasContent(state)) {
-    if (list.length) await openDraft(list[0]);
+    if (list.length) await openDraft(list[0], view);
     else await createDraft(state);
   } else if (list.length < MAX_DRAFTS) await createDraft(state);
   setStatus('');
@@ -232,7 +447,7 @@ async function afterLogin() {
 
 async function login() {
   try {
-    sessionStorage.setItem(LOGIN_FLAG, '1');
+    sessionStorage.setItem(LOGIN_FLAG, viewFromHash()); // 로그인을 누른 화면. 돌아오면 주소의 #/... 가 빠짐
     await backend.login();
   } catch (e) {
     sessionStorage.removeItem(LOGIN_FLAG);
@@ -256,12 +471,21 @@ document.addEventListener('beforetoggle', (e) => {
   if (e.newState !== 'open' || !menu.classList?.contains('my-menu')) return;
   const r = document.querySelector(`[popovertarget="${menu.id}"]`).getBoundingClientRect();
   menu.style.top = `${r.bottom + 6}px`;
-  menu.style.right = `${Math.max(8, innerWidth - r.right)}px`;
+  if (menu.classList.contains('main-menu')) menu.style.left = `${Math.max(8, r.left)}px`; // 왼쪽 햄버거 메뉴
+  else menu.style.right = `${Math.max(8, innerWidth - r.right)}px`;
 }, true);
 document.addEventListener('click', (e) => {
   const t = e.target;
   if (t.closest('.my-menu button')) t.closest('.my-menu').hidePopover();
   if (t.closest('[data-login]')) login();
+  else if (t.closest('[data-keep-login]')) {
+    sessionStorage.setItem(KEEP_FLAG, '1');
+    login();
+  }
+  else if (t.closest('[data-invite-login]')) {
+    sessionStorage.setItem(INVITE_FLAG, inviteCode());
+    login();
+  }
   else if (t.closest('[data-save-draft]')) saveDraft(true);
   else if (t.closest('[data-new-draft]')) newDraft();
   else if (t.closest('[data-logout]')) logout();
@@ -303,6 +527,8 @@ draftsEl.addEventListener('click', async (e) => {
       console.error('open draft failed', err);
       setStatus('시안을 불러오지 못했어요', true);
     }
+  } else if (b.dataset.invite) {
+    await openInvite(b.dataset.invite);
   } else if (b.dataset.rename) {
     if (await renameDraft(b.dataset.rename)) await renderMyPage();
   } else if (b.dataset.rm) {
@@ -361,6 +587,7 @@ async function logout() {
   }
   user = null;
   profile = null;
+  draftDates = [];
   setDraftId(null);
   renderAuth();
   setStatus('');
@@ -399,8 +626,30 @@ const showProfile = () => {
   document.getElementById('my-name').textContent = profile?.nickname || user.name;
   document.getElementById('my-date').textContent = weddingText();
 };
+// 계정의 모든 시안 촬영일 (홈 내 일정·체크리스트가 읽음). 지금 연 시안은 home-cal.js 가 화면 값으로 덮어씀
+let draftDates = [];
+window.draftShoots = () => draftDates;
+const setDraftDates = (list) => {
+  draftDates = list.map((d) => ({ id: d.id, name: d.name, date: d.data?.basic?.date || '' }));
+  refreshDates();
+};
+// 본식일·촬영일이 보이는 화면(홈 내 일정, 체크리스트)을 지금 값으로 다시 그림
+const refreshDates = () => {
+  const v = document.body.dataset.view;
+  if (v === 'home') window.renderHomeCal?.();
+  if (v === 'checklist') window.renderChecklist?.();
+};
+// 체크리스트에서 본식일을 고치면 결혼 예정 날짜도 그 날로 (정확한 날짜라 오차 0). 프로필이 아직 없으면 체크리스트에만 둠
+window.saveWeddingDate = (d) => {
+  if (!user || !profile || (profile.wedding_date || '') === d) return;
+  sb.from('profiles').update({ wedding_date: d || null, wedding_date_range: d ? 0 : null }).eq('user_id', user.id)
+    .select('nickname,role,character,wedding_date,wedding_date_range').single()
+    .then((r) => { profile = must(r); showProfile(); })
+    .catch((e) => console.error('wedding date save failed', e));
+};
 async function ensureProfile(ask) {
   profile = must(await sb.from('profiles').select('nickname,role,character,wedding_date,wedding_date_range').maybeSingle());
+  refreshDates();
   if (profile?.nickname && profile.role) return showProfile();
   if (ask) openProfile('onboard');
 }
@@ -444,6 +693,8 @@ profileForm.addEventListener('submit', async (e) => {
     }).select('nickname,role,character,wedding_date,wedding_date_range').single());
     profileDlg.close();
     showProfile();
+    window.checklistSync?.setWedding(profile.wedding_date || '');
+    refreshDates();
     track(profileDlg.dataset.mode === 'onboard' ? 'profile_done' : 'profile_edit', { role });
   } catch (err) {
     if (err.code === '23505') { // 닉네임 unique 위반
@@ -467,14 +718,17 @@ profileForm.addEventListener('submit', async (e) => {
     draftId = user && localStorage.getItem('wr-draft');
     syncedAt = Number(localStorage.getItem('wr-synced')) || 0;
     renderAuth();
-    if (viewFromHash() === 'my') {
-      if (user) renderView('my');
+    if (LOGIN_VIEWS.includes(viewFromHash())) {
+      if (user) renderView(viewFromHash());
       else history.replaceState(null, '', urlOf('home'));
     }
-    if (user && sessionStorage.getItem(LOGIN_FLAG)) {
+    const loginFrom = user && sessionStorage.getItem(LOGIN_FLAG);
+    if (loginFrom) {
       sessionStorage.removeItem(LOGIN_FLAG);
       justLoggedIn = true;
-      await afterLogin();
+      const stay = ['checklist', 'test'].includes(loginFrom); // 로그인을 누른 화면으로 돌아옴 (test 는 결과가 복원됨)
+      await afterLogin(sessionStorage.getItem(KEEP_FLAG) || stay ? null : 'edit');
+      if (stay) show(loginFrom);
     } else if (user && draftId) {
       // 다른 창·기기에서 이 시안을 더 저장했으면 그 내용으로 바꿔 둠
       const d = await backend.get(user.id, draftId);
@@ -486,9 +740,22 @@ profileForm.addEventListener('submit', async (e) => {
     console.error('auth init failed', e);
     setStatus('로그인 상태를 확인하지 못했어요', true);
   }
+  refreshDates(); // 계정에서 불러온 시안의 촬영일
+  if (user) backend.list().then(setDraftDates).catch((e) => console.error('draft dates load failed', e));
   // 로그인 직후에만, 닉네임·신랑신부가 비어 있으면 입력 창. 실패해도 다른 기능은 그대로 씀
   if (user) ensureProfile(justLoggedIn).catch((e) => console.error('profile load failed', e));
+  syncChecklist().catch((e) => { console.error('checklist load failed', e); clSyncErr(true); });
   authChecked = true;
-  if (viewFromHash() === 'edit') askLogin();
+  // 초대 화면에서 로그인하고 돌아왔으면 그 초대를 다시 열어 마이페이지에 보관
+  // 테스트 결과 화면에서 로그인하고 돌아왔으면 그 결과를 저장
+  const keep = sessionStorage.getItem(KEEP_FLAG);
+  sessionStorage.removeItem(KEEP_FLAG);
+  const kept = keep && window.testResult?.();
+  if (user && kept) window.saveTestResult(kept);
+  const pendingInvite = sessionStorage.getItem(INVITE_FLAG);
+  sessionStorage.removeItem(INVITE_FLAG);
+  if (user && pendingInvite) openInviteView(pendingInvite);
+  else if (viewFromHash() === 'invite') renderInvite();
+  if (['edit', 'checklist'].includes(viewFromHash())) askLogin();
 })();
 renderAuth();

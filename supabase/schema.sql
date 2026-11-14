@@ -82,3 +82,119 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 values ('inquiries', 'inquiries', false, 2097152, array['image/jpeg']);
 create policy "anyone uploads inquiry photos" on storage.objects for insert to anon, authenticated
   with check (bucket_id = 'inquiries');
+
+-- 초대: 시안 하나를 링크·QR·코드로 보여 줌 (보기만). 신랑, 메이크업샵처럼 그 시안을 같이 봐야 하는 사람에게 보냄
+-- 원본 시안을 그대로 보여 줘서 고친 내용이 바로 보이고, 신랑·신부 이름과 촬영일도 보임
+-- 로그인하지 않은 사람은 브라우저가 익명 로그인(Supabase Auth 설정의 Anonymous sign-ins 를 켜야 함)해서 봄
+-- 초대를 끊으면(행 삭제) 받은 사람 모두 더 못 봄. 시안을 지워도 같이 끊김
+create table public.invites (
+  code text primary key check (code ~ '^[A-HJ-NP-Z2-9]{8}$'), -- 브라우저가 헷갈리는 글자(I, O, 0, 1)를 빼고 만듦
+  user_id uuid not null default auth.uid(),
+  draft_id text not null,
+  created_at timestamptz not null default now(),
+  unique (user_id, draft_id),
+  foreign key (user_id, draft_id) references public.drafts (user_id, id) on delete cascade
+);
+alter table public.invites enable row level security;
+create policy "own invites" on public.invites for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+revoke all on public.invites from anon;
+grant select, insert, delete on public.invites to authenticated;
+
+-- 초대받은 사람. 정책이 없어 직접은 못 읽고 쓰며 아래 함수로만 다룸
+create table public.invite_guests (
+  code text not null references public.invites on delete cascade,
+  user_id uuid not null references auth.users on delete cascade,
+  joined_at timestamptz not null default now(),
+  primary key (code, user_id)
+);
+alter table public.invite_guests enable row level security;
+revoke all on public.invite_guests from anon, authenticated;
+
+-- 초대 코드로 들어옴: 받은 사람으로 기록하고 그 시안을 돌려줌. 자기 초대 링크를 연 주인은 기록하지 않고 보여만 줌
+create function public.join_invite(c text) returns table (code text, nickname text, name text, data jsonb, updated_at timestamptz)
+language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.invite_guests (code, user_id)
+    select i.code, auth.uid() from public.invites i where i.code = upper(c) and i.user_id <> auth.uid()
+    on conflict do nothing;
+  return query
+    select i.code, coalesce(p.nickname, ''), d.name, d.data, d.updated_at
+    from public.invites i
+    join public.drafts d on d.user_id = i.user_id and d.id = i.draft_id
+    left join public.profiles p on p.user_id = i.user_id
+    where i.code = upper(c);
+  if not found then
+    raise exception 'invite not found' using errcode = 'P0001';
+  end if;
+end $$;
+-- 마이페이지 '공유받은 시안'
+create function public.invited_drafts() returns table (code text, nickname text, name text, data jsonb, updated_at timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select i.code, coalesce(p.nickname, ''), d.name, d.data, d.updated_at
+  from public.invite_guests g
+  join public.invites i on i.code = g.code
+  join public.drafts d on d.user_id = i.user_id and d.id = i.draft_id
+  left join public.profiles p on p.user_id = i.user_id
+  where g.user_id = auth.uid()
+  order by g.joined_at desc
+$$;
+revoke execute on function public.join_invite(text), public.invited_drafts() from public, anon;
+grant execute on function public.join_invite(text), public.invited_drafts() to authenticated;
+
+-- 받은 초대의 시안에 들어 있는 사진은 읽을 수 있음. 시안 주인 폴더의 사진만 (시안에 남의 사진 경로를 적어 넣어 읽는 것을 막음)
+create function public.is_invited_photo(path text) returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.invite_guests g
+    join public.invites i on i.code = g.code
+    join public.drafts d on d.user_id = i.user_id and d.id = i.draft_id
+    where g.user_id = auth.uid() and path like i.user_id::text || '/%'
+      and jsonb_path_exists(d.data, 'lax $.** ? (@ == $p)', jsonb_build_object('p', 'sb:' || path)))
+$$;
+create policy "invited photos read" on storage.objects for select to authenticated
+  using (bucket_id = 'photos' and public.is_invited_photo(name));
+
+-- 익명 로그인한 사람은 보기만. 시안·프로필·초대 만들기와 사진 올리기는 카카오로 로그인한 사람만
+create policy "members only" on public.drafts as restrictive for all to authenticated
+  using ((auth.jwt() ->> 'is_anonymous')::boolean is not true);
+create policy "members only" on public.profiles as restrictive for all to authenticated
+  using ((auth.jwt() ->> 'is_anonymous')::boolean is not true);
+create policy "members only" on public.invites as restrictive for all to authenticated
+  using ((auth.jwt() ->> 'is_anonymous')::boolean is not true);
+create policy "members only photos insert" on storage.objects as restrictive for insert to authenticated
+  with check (bucket_id <> 'photos' or (auth.jwt() ->> 'is_anonymous')::boolean is not true);
+
+-- 성향 테스트 결과: 카카오 로그인한 사람이 테스트를 끝낼 때마다 한 줄씩 쌓음. 최신 결과는 profiles.character 에도 적음
+create table public.test_results (
+  id bigint generated always as identity primary key,
+  user_id uuid not null default auth.uid() references auth.users on delete cascade,
+  character text not null,          -- 캐릭터 키 (mbti/data.js CHARACTERS)
+  value text not null,              -- 가치관 축 결과 (R/G/M/S)
+  gender text,
+  answers jsonb not null,           -- [{ q: 문항, a: 고른 답, i: 답 번호 }]
+  value_percent jsonb not null,     -- 가치관 축별 % (합 100)
+  style_percent jsonb not null,     -- 스타일 축별 % (합 100)
+  created_at timestamptz not null default now()
+);
+create index on public.test_results (user_id, created_at desc);
+alter table public.test_results enable row level security;
+create policy "own results" on public.test_results for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "members only" on public.test_results as restrictive for all to authenticated
+  using ((auth.jwt() ->> 'is_anonymous')::boolean is not true);
+revoke all on public.test_results from anon;
+grant select, insert on public.test_results to authenticated;
+
+-- 결혼 준비 체크리스트: 계정당 하나. 브라우저 저장값(checklist/app.js state)을 그대로 넣음
+create table public.checklists (
+  user_id uuid primary key default auth.uid() references auth.users on delete cascade,
+  data jsonb not null check (octet_length(data::text) <= 300000), -- 기본 항목이 약 20KB. 마구 커지는 것만 막음
+  updated_at timestamptz not null default now()
+);
+alter table public.checklists enable row level security;
+create policy "own checklist" on public.checklists for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "members only" on public.checklists as restrictive for all to authenticated
+  using ((auth.jwt() ->> 'is_anonymous')::boolean is not true);
+revoke all on public.checklists from anon;
+grant select, insert, update on public.checklists to authenticated;

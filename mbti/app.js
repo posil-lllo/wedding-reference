@@ -1,3 +1,5 @@
+// 홈(index.html) SPA 의 #/test 화면. 홈 스크립트와 이름(show, track, restore 등)이 겹치지 않게 함수로 감쌈
+(() => {
 const QUESTIONS = [...VALUE_QUESTIONS, ...STYLE_QUESTIONS];
 const $ = (id) => document.getElementById(id);
 const track = (name, params = {}) => window.gtag?.("event", name, params);
@@ -7,7 +9,7 @@ let answers = [];
 let resultKey = null;
 
 function show(id) {
-  for (const s of document.querySelectorAll(".screen")) s.hidden = s.id !== id;
+  for (const s of document.querySelectorAll("#view-test .screen")) s.hidden = s.id !== id;
   window.scrollTo(0, 0);
 }
 
@@ -54,16 +56,29 @@ function renderQuestion() {
     // 문항끼리는 독립이라 답을 바꿔도 뒤 질문 답은 그대로 둔다.
     b.onclick = () => {
       ahead.shift();
-      answers.push(n);
-      // 새로고침으로 결과를 다시 볼 때는 세지 않도록 마지막 답을 고른 순간에만
-      if (answers.length === QUESTIONS.length) track("mbti_complete", { gender, character: CHARACTERS[decide().key].name });
-      renderQuestion();
+      answer(n);
     };
     return b;
   }));
   $("back").hidden = i === 0;
   $("next").hidden = ahead.length === 0;
   show("quiz");
+}
+
+// 답을 고르거나 "다음"으로 넘길 때 모두 여기로. 새로고침으로 결과를 다시 볼 때는 세지 않도록 마지막 답이 들어간 순간에만 완료 처리
+// 다 푼 결과 (저장용). "로그인하고 결과 보관하기"로 카카오에서 돌아왔을 때 account.js 도 부름
+window.testResult = () => answers.length === QUESTIONS.length
+  ? { ...decide(), gender, answers: answers.map((a, k) => ({ q: QUESTIONS[k].q, a: QUESTIONS[k].options[a].text, i: a })) }
+  : null;
+
+function answer(n) {
+  answers.push(n);
+  if (answers.length === QUESTIONS.length) {
+    const r = window.testResult();
+    track("mbti_complete", { gender, character: CHARACTERS[r.key].name });
+    window.saveTestResult?.(r);
+  }
+  renderQuestion();
 }
 
 const decide = () => decideCharacter(
@@ -78,7 +93,7 @@ function renderResult() {
   img.hidden = !c.image;
   img.onerror = () => { img.hidden = true; };
   if (c.image) {
-    img.src = encodeURI(`서있는모습/${c.image}-${gender}.png`);
+    img.src = encodeURI(`mbti/서있는모습/${c.image}-${gender}.png`);
     img.alt = c.name;
   } else {
     img.removeAttribute("src");
@@ -164,7 +179,7 @@ for (const b of document.querySelectorAll("[data-gender]")) {
   b.onclick = () => { gender = b.dataset.gender; answers = []; ahead = []; track("mbti_start", { gender }); renderQuestion(); };
 }
 $("back").onclick = () => { ahead.unshift(answers.pop()); renderQuestion(); };
-$("next").onclick = () => { answers.push(ahead.shift()); renderQuestion(); };
+$("next").onclick = () => answer(ahead.shift());
 // 카카오 JavaScript 키는 등록한 도메인에서만 동작한다.
 const KAKAO_KEY = "eddcdfcb6c5ae4b85f18cec5e60f48c8";
 const hasKakao = typeof Kakao !== "undefined";
@@ -173,14 +188,15 @@ $("share").hidden = !hasKakao;
 $("share").onclick = () => {
   const c = CHARACTERS[resultKey];
   track("mbti_share", { method: "kakao", character: c.name });
-  const home = new URL(".", location.href).href;
-  const detail = `${home}characters.html?c=${resultKey}&g=${encodeURIComponent(gender)}`;
+  const root = new URL(".", location.href).href;
+  const home = `${root}#/test`;
+  const detail = `${root}#/chars?c=${resultKey}&g=${encodeURIComponent(gender)}`;
   Kakao.Share.sendDefault({
     objectType: "feed",
     content: {
       title: `나의 결혼준비 유형은? ${c.name}`,
       description: c.line,
-      imageUrl: new URL(encodeURI(`서있는모습/${c.image}-${gender}.png`), location.href).href,
+      imageUrl: new URL(encodeURI(`mbti/서있는모습/${c.image}-${gender}.png`), location.href).href,
       link: { mobileWebUrl: detail, webUrl: detail },
     },
     buttons: [
@@ -201,3 +217,4 @@ $("story").onclick = async () => {
 };
 $("restart").onclick = () => { answers = []; clearSaved(); show("start"); };
 if (restore()) renderQuestion();
+})();
