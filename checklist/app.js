@@ -17,11 +17,18 @@
     { rename: { '헬퍼비·수고비 현금 봉투 준비': '사례비 봉투 준비' },
       add: { 결혼식: ['결혼반지', '가방순이용 식권', '청심환', '신랑 긴양말', '아빠들 긴양말', '2부 의상', '포토테이블 사진', '사례비 봉투 챙기기', '식권'] } },
     { remove: ['체크리스트 확인하며 준비하기'] },
+    { split: { '스튜디오·드레스·메이크업(스드메) 계약': ['스튜디오 계약', '드레스샵 계약', '메이크업샵 계약'] } },
   ];
   const defaultMemo = new Map(DEFAULT_PHASES.flatMap(([, , , items]) => items.flatMap(([, checks]) => checks.map((c) => [].concat(c)))));
   const newCheck = (text) => ({ id: uid(), text, memo: defaultMemo.get(text) || '', done: false });
+  const defaultItem = new Map(DEFAULT_PHASES.flatMap(([, , , items]) => items.map(([title, checks, tips]) => [title, { texts: checks.map((c) => [].concat(c)[0]), tips }])));
+  // split: 기존 항목 → 기본 항목 여러 개. 할 일은 기본 위치로 나뉘고, 직접 추가한 할 일은 첫 항목에 남음. 시기·날짜는 기존 항목 것을 그대로 씀
+  const splitItem = (it, titles) => {
+    const owner = (c) => titles.find((t) => defaultItem.get(t).texts.includes(c.text)) ?? titles[0];
+    return titles.map((title, i) => ({ ...it, id: i ? uid() : it.id, title, tips: defaultItem.get(title).tips, checks: it.checks.filter((c) => owner(c) === title) }));
+  };
   function upgrade(s) {
-    const items = UPGRADES.slice(s.v || 0).reduce((items, { rename = {}, add = {}, remove = [] }) => items.map((it) => {
+    const items = UPGRADES.slice(s.v || 0).reduce((items, { rename = {}, add = {}, remove = [], split = {} }) => items.flatMap((it) => (split[it.title] ? splitItem(it, split[it.title]) : [it])).map((it) => {
       const checks = it.checks.filter((c) => !remove.includes(c.text)).map((c) => (rename[c.text] ? { ...c, text: rename[c.text], memo: c.memo || defaultMemo.get(rename[c.text]) || '' } : c));
       const have = new Set(checks.map((c) => c.text));
       return { ...it, checks: [...checks, ...(add[it.title] || []).filter((t) => !have.has(t)).map(newCheck)] };
@@ -68,7 +75,10 @@
     }
   }
 
+  // 일정: date 시작일, end 끝나는 날(하루면 ''). 칸 값은 'YYYY-MM-DD ~ YYYY-MM-DD'
   const dateOf = (it) => it.date;
+  const rangeVal = (it) => (it.end ? `${it.date} ~ ${it.end}` : it.date);
+  const whenText = (it, from = 2) => (it.date ? fmt(it.date).slice(from) + (it.end ? ` ~ ${fmt(it.end).slice(it.end.slice(0, 4) === it.date.slice(0, 4) ? 5 : 2)}` : '') : '');
   const byId = (id) => state.items.find((it) => it.id === id);
   const doneCount = (it) => it.checks.filter((c) => c.done).length;
 
@@ -95,12 +105,12 @@
   function itemHtml(it, open) {
     const n = doneCount(it);
     const allDone = it.checks.length > 0 && n === it.checks.length;
-    const d = dateOf(it);
+    const when = whenText(it);
     const checks = hideDone ? it.checks.filter((c) => !c.done) : it.checks;
     return `<details class="cl-item${allDone ? ' done' : ''}" data-id="${it.id}"${open ? ' open' : ''}>
-      <summary><span class="cl-title">${esc(it.title)}</span>${d ? `<span class="cl-when">${fmt(d).slice(2)}</span>` : ''}<span class="note">${n} / ${it.checks.length}</span></summary>
+      <summary><span class="cl-title">${esc(it.title)}</span>${when ? `<span class="cl-when">${when}</span>` : ''}<span class="note">${n} / ${it.checks.length}</span></summary>
       <div class="cl-sched">
-        <label>일정 <input class="in" type="text" readonly data-pick="date" placeholder="날짜 선택" data-k="date" value="${d}"></label>
+        <label>일정 <input class="in" type="text" readonly data-pick="range" placeholder="날짜·기간 선택" size="23" data-k="date" value="${rangeVal(it)}"></label>
       </div>
       <ul class="cl-checks">${checks.map((c) => checkHtml(c)).join('')}</ul>
       <form class="cl-add"><input class="in" name="text" placeholder="할 일 추가" aria-label="추가할 할 일" maxlength="100"><button class="btn pill">추가</button></form>
@@ -120,7 +130,7 @@
   function renderChecks() {
     const rows = state.items.flatMap((it) => it.checks
       .filter((c) => !(hideDone && c.done))
-      .map((c) => checkHtml(c, `<button type="button" class="cl-from" data-go="${it.id}">${esc(it.title)}${dateOf(it) ? ` · ${fmt(dateOf(it)).slice(5)}` : ''}</button>`)));
+      .map((c) => checkHtml(c, `<button type="button" class="cl-from" data-go="${it.id}">${esc(it.title)}${dateOf(it) ? ` · ${whenText(it, 5)}` : ''}</button>`)));
     return rows.length ? `<ul class="cl-checks cl-flat">${rows.join('')}</ul>` : '<p class="note cl-empty">남은 할 일이 없어요.</p>';
   }
 
@@ -180,7 +190,7 @@
   list.addEventListener('change', (e) => {
     if (e.target.dataset.k === 'date') {
       const it = byId(e.target.closest('.cl-item').dataset.id);
-      it.date = e.target.value;
+      [it.date, it.end = ''] = e.target.value.split(' ~ ');
       return changed(e.target);
     }
     const li = e.target.closest('[data-cid]');
@@ -257,7 +267,7 @@
   function renderOrder() {
     orderList.innerHTML = DEFAULT_PHASES.map(([p], i) => `<h3>${esc(p)}</h3><ol data-phase="${i}">${state.items.filter((it) => it.phase === p).map((it) => `<li data-id="${it.id}">
       <button type="button" class="cl-grip" aria-label="${esc(it.title)} 옮기기, 위아래 화살표 키로도 옮겨요">⠿</button>
-      <span>${esc(it.title)}</span>${dateOf(it) ? `<span class="note">${fmt(dateOf(it)).slice(2)}</span>` : ''}</li>`).join('')}</ol>`).join('');
+      <span>${esc(it.title)}</span>${dateOf(it) ? `<span class="note">${whenText(it)}</span>` : ''}</li>`).join('')}</ol>`).join('');
   }
   // 팝업의 순서·시기를 그대로 저장
   function commitOrder() {

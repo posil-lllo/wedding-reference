@@ -134,8 +134,9 @@ function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {})
   };
 }
 
-// 날짜·시간 칸 공용 팝업. <input data-pick="date|time" readonly> 를 누르면 열림 (체크리스트 예식일·일정, 시안 촬영 날짜·시간)
-// 값은 기본 입력과 같은 YYYY-MM-DD / HH:MM 이고, 고르면 input·change 이벤트를 보내 기존 저장 코드가 그대로 받음
+// 날짜·시간 칸 공용 팝업. <input data-pick="date|range|time" readonly> 를 누르면 열림 (체크리스트 예식일·일정, 시안 촬영 날짜·시간)
+// 값은 기본 입력과 같은 YYYY-MM-DD / HH:MM 이고, range 는 두 번 눌러 'YYYY-MM-DD ~ YYYY-MM-DD' (같은 날이거나 하나만 고르고 닫으면 YYYY-MM-DD).
+// 고르면 고르면 input·change 이벤트를 보내 기존 저장 코드가 그대로 받음
 // 넓은 화면은 칸 아래 카드, 좁은 화면은 아래에서 올라오는 시트 (위치는 CSS 가 --x/--y 로 잡음)
 (() => {
   const WEEK = '일월화수목금토';
@@ -149,6 +150,7 @@ function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {})
   let input = null;
   let view = { y: 0, m: 0 };
   let mode = 'day'; // day / year / month / time
+  let from = null; // range: 먼저 고른 날. 끝나는 날을 고르는 중
 
   const btn = (data, text, on = false, cls = '') =>
     `<button type="button" ${data}${cls ? ` class="${cls}"` : ''} aria-pressed="${on}">${text}</button>`;
@@ -160,13 +162,17 @@ function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {})
 
   const views = {
     day: ({ y, m }) => {
+      const isRange = input.dataset.pick === 'range';
+      const [a, b = a] = from ? [from] : isRange ? input.value.split(' ~ ') : [input.value];
       let cells = WEEK.split('').map((w) => `<i>${w}</i>`).join('') + '<span></span>'.repeat(new Date(y, m, 1).getDay());
       for (let d = 1, last = new Date(y, m + 1, 0).getDate(); d <= last; d++) {
         const v = isoOf(y, m, d);
-        cells += btn(`data-d="${v}"`, d, v === input.value, v === today ? 'today' : '');
+        const cls = [v === today && 'today', a !== b && v >= a && v <= b && 'in-range', a !== b && v === a && 'range-start', a !== b && v === b && 'range-end'];
+        cells += btn(`data-d="${v}"`, d, v === a || v === b, cls.filter(Boolean).join(' '));
       }
       return head(`<button type="button" class="cal-t" data-mode="year">${y}년 ${m + 1}월</button>`, 1, '달')
         + `<div class="cal-g days">${cells}</div>`
+        + (isRange ? `<p class="cal-l" aria-live="polite">${from ? '끝나는 날을 고르세요. 하루면 같은 날을 한 번 더' : '시작하는 날을 고르세요'}</p>` : '')
         + foot('<button type="button" class="cal-x" data-d="">지우기</button>', `<button type="button" class="cal-x" data-d="${today}">오늘</button>`);
     },
     year: ({ y }) => {
@@ -207,8 +213,9 @@ function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {})
 
   const open = (el) => {
     input = el;
+    from = null;
     mode = el.dataset.pick === 'time' ? 'time' : 'day';
-    const [y, m] = (el.value || today).split('-').map(Number);
+    const [y, m] = (el.value || today).slice(0, 10).split('-').map(Number);
     view = { y, m: m - 1 };
     pop.setAttribute('aria-label', el.dataset.pick === 'time' ? '시간 선택' : '날짜 선택');
     pop.innerHTML = views[mode](view);
@@ -236,10 +243,21 @@ function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {})
     if (pop.matches(':popover-open') && !pop.contains(e.target) && matchMedia('(min-width: 561px)').matches) pop.hidePopover();
   }, true);
 
+  // 시작일만 고르고 닫으면 그날 하루로
+  pop.addEventListener('toggle', (e) => {
+    if (e.newState === 'closed' && from) { set(from); from = null; }
+  });
+
   pop.addEventListener('click', (e) => {
     const t = e.target.closest('button');
     if (!t) return;
     const ds = t.dataset;
+    if ('d' in ds && input.dataset.pick === 'range' && ds.d) {
+      if (!from) return (from = ds.d), render(`[data-d="${ds.d}"]`);
+      const [a, b] = [from, ds.d].sort();
+      from = null;
+      return set(a === b ? a : `${a} ~ ${b}`), close();
+    }
     if ('d' in ds) return set(ds.d), close();
     if ('close' in ds) return close();
     if ('clear' in ds) return set(''), close();

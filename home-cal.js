@@ -20,25 +20,27 @@
       const times = [['메이크업', state.makeup.start], [state.studio.kind, state.studio.start]].filter(([, t]) => t).map(([k, t]) => `${k} ${t}`);
       list.push({ date: b.date, title: '웨딩촬영', sub: times.join(' · '), kind: 'shoot', go: 'edit' });
     }
-    (cl.items || []).filter((it) => it.date).forEach((it) => list.push({ date: it.date, title: it.title, kind: 'todo', go: 'checklist' }));
+    (cl.items || []).filter((it) => it.date).forEach((it) => list.push({ date: it.date, end: it.end || it.date, title: it.title, kind: 'todo', go: 'checklist' }));
     return list.sort((a, c) => a.date.localeCompare(c.date));
   }
 
   function render() {
     const { y, m } = view;
     const all = events();
-    const month = all.filter((e) => e.date.startsWith(`${y}-${pad(m + 1)}-`));
+    const on = (e, v) => e.date <= v && v <= (e.end || e.date); // 기간 일정은 걸친 날마다 점
+    const month = all.filter((e) => e.date <= isoOf(y, m, 31) && (e.end || e.date) >= isoOf(y, m, 1));
     const today = isoOf(now.getFullYear(), now.getMonth(), now.getDate());
     let cells = WEEK.split('').map((w) => `<i>${w}</i>`).join('') + '<span></span>'.repeat(new Date(y, m, 1).getDay());
     for (let d = 1, last = new Date(y, m + 1, 0).getDate(); d <= last; d++) {
       const v = isoOf(y, m, d);
-      const kinds = [...new Set(month.filter((e) => e.date === v).map((e) => e.kind))];
+      const kinds = [...new Set(month.filter((e) => on(e, v)).map((e) => e.kind))];
       cells += `<span class="${v === today ? 'today' : ''}">${d}${kinds.length ? `<b>${kinds.map((k) => `<em class="${k}"></em>`).join('')}</b>` : ''}</span>`;
     }
     const rows = month.map((e) => {
-      const [, mm, dd] = e.date.split('-').map(Number);
-      const w = WEEK[new Date(y, mm - 1, dd).getDay()];
-      return `<li><button type="button" data-view="${e.go}"><span class="hc-d">${mm}.${dd} (${w})</span><em class="${e.kind}"></em><span class="hc-t">${esc(e.title)}${e.sub ? `<small>${esc(e.sub)}</small>` : ''}</span></button></li>`;
+      const [yy, mm, dd] = e.date.split('-').map(Number); // 기간이 지난달부터 걸치면 시작일은 다른 달·해
+      const w = WEEK[new Date(yy, mm - 1, dd).getDay()];
+      const until = e.end && e.end !== e.date ? ` ~ ${e.end.split('-').slice(1).map(Number).join('.')}` : '';
+      return `<li><button type="button" data-view="${e.go}"><span class="hc-d">${mm}.${dd} (${w})${until}</span><em class="${e.kind}"></em><span class="hc-t">${esc(e.title)}${e.sub ? `<small>${esc(e.sub)}</small>` : ''}</span></button></li>`;
     }).join('');
     const empty = all.length
       ? '이번 달에는 일정이 없어요.'
