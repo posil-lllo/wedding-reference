@@ -80,6 +80,9 @@ function update(path, v) {
   state = setIn(state, toPath(path), v);
   scheduleSave();
 }
+// 체크리스트 '웨딩촬영' 항목에서 날짜를 고치고 시안에도 넣기로 했을 때 (checklist/app.js)
+window.shootDate = () => state.basic.date;
+window.setShootDate = (d) => { update('basic.date', d); renderEditor(); };
 
 // ── IndexedDB 저장 ──
 // iOS Safari 는 앱 전환 뒤 연결이 끊기는 일이 있어, 실패하면 새로 열어 한 번 더 시도

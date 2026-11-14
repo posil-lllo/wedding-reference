@@ -75,7 +75,7 @@ function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {})
       + '<button type="button" class="btn cal-done" data-done>완료</button>';
   };
   const open = () => {
-    draft = value;
+    draft = value.date ? value : { date: '', range: 0 }; // 아직 안 정했으면 '정확한 날짜'가 골라진 채로 열림
     mode = 'day';
     view = draft.date ? { y: parse(draft.date)[0], m: parse(draft.date)[1] - 1 } : { y: thisYear, m: thisMonth };
     render();

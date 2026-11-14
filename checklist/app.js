@@ -12,12 +12,13 @@
   const fmt = (iso) => iso.replaceAll('-', '.');
 
   // 기본 할 일을 나중에 바꾸면 여기에 한 줄 추가. 이미 쓰던 체크리스트에 한 번만 반영 (state.v 로 기록해 지운 할 일을 되살리지 않음)
-  // rename: 기존 할 일 이름 → 새 이름 (메모가 비어 있으면 기본 메모도 채움) · add: 항목 제목 → 없으면 덧붙일 할 일 · remove: 뺄 할 일 이름
+  // rename: 기존 할 일 이름 → 새 이름 (메모가 비어 있으면 기본 메모도 채움) · add: 항목 제목 → 없으면 덧붙일 할 일 · remove: 뺄 할 일 이름 · title: 항목 제목 → 새 제목
   const UPGRADES = [
     { rename: { '헬퍼비·수고비 현금 봉투 준비': '사례비 봉투 준비' },
       add: { 결혼식: ['결혼반지', '가방순이용 식권', '청심환', '신랑 긴양말', '아빠들 긴양말', '2부 의상', '포토테이블 사진', '사례비 봉투 챙기기', '식권'] } },
     { remove: ['체크리스트 확인하며 준비하기'] },
     { split: { '스튜디오·드레스·메이크업(스드메) 계약': ['스튜디오 계약', '드레스샵 계약', '메이크업샵 계약'] } },
+    { title: { '스튜디오 웨딩촬영': '웨딩촬영' } },
   ];
   const defaultMemo = new Map(DEFAULT_PHASES.flatMap(([, , , items]) => items.flatMap(([, checks]) => checks.map((c) => [].concat(c)))));
   const newCheck = (text) => ({ id: uid(), text, memo: defaultMemo.get(text) || '', done: false });
@@ -28,10 +29,10 @@
     return titles.map((title, i) => ({ ...it, id: i ? uid() : it.id, title, tips: defaultItem.get(title).tips, checks: it.checks.filter((c) => owner(c) === title) }));
   };
   function upgrade(s) {
-    const items = UPGRADES.slice(s.v || 0).reduce((items, { rename = {}, add = {}, remove = [], split = {} }) => items.flatMap((it) => (split[it.title] ? splitItem(it, split[it.title]) : [it])).map((it) => {
+    const items = UPGRADES.slice(s.v || 0).reduce((items, { rename = {}, add = {}, remove = [], split = {}, title = {} }) => items.flatMap((it) => (split[it.title] ? splitItem(it, split[it.title]) : [it])).map((it) => {
       const checks = it.checks.filter((c) => !remove.includes(c.text)).map((c) => (rename[c.text] ? { ...c, text: rename[c.text], memo: c.memo || defaultMemo.get(rename[c.text]) || '' } : c));
       const have = new Set(checks.map((c) => c.text));
-      return { ...it, checks: [...checks, ...(add[it.title] || []).filter((t) => !have.has(t)).map(newCheck)] };
+      return { ...it, title: title[it.title] || it.title, checks: [...checks, ...(add[it.title] || []).filter((t) => !have.has(t)).map(newCheck)] };
     }), s.items);
     return { ...s, items, v: UPGRADES.length };
   }
@@ -76,9 +77,17 @@
   }
 
   // 일정: date 시작일, end 끝나는 날(하루면 ''). 칸 값은 'YYYY-MM-DD ~ YYYY-MM-DD'
-  const dateOf = (it) => it.date;
+  // '웨딩촬영' 항목: 직접 정한 날짜가 없으면 시안의 촬영 날짜(home-cal.js shootInfo)를 씀.
+  // 여기서 날짜를 고치면 지금 연 시안에도 넣을지 물어봄 (app.js setShootDate)
+  const SHOOT_TITLE = '웨딩촬영';
+  const shootOf = (it) => (it.title === SHOOT_TITLE && !it.date && window.shootInfo?.()) || null;
+  const dated = (it) => { const sh = shootOf(it); return sh ? { ...it, date: sh.date, end: '' } : it; };
+  const dateOf = (it) => dated(it).date;
   const rangeVal = (it) => (it.end ? `${it.date} ~ ${it.end}` : it.date);
-  const whenText = (it, from = 2) => (it.date ? fmt(it.date).slice(from) + (it.end ? ` ~ ${fmt(it.end).slice(it.end.slice(0, 4) === it.date.slice(0, 4) ? 5 : 2)}` : '') : '');
+  const whenText = (raw, from = 2) => {
+    const it = dated(raw);
+    return it.date ? fmt(it.date).slice(from) + (it.end ? ` ~ ${fmt(it.end).slice(it.end.slice(0, 4) === it.date.slice(0, 4) ? 5 : 2)}` : '') : '';
+  };
   const byId = (id) => state.items.find((it) => it.id === id);
   const doneCount = (it) => it.checks.filter((c) => c.done).length;
 
@@ -110,7 +119,7 @@
     return `<details class="cl-item${allDone ? ' done' : ''}" data-id="${it.id}"${open ? ' open' : ''}>
       <summary><span class="cl-title">${esc(it.title)}</span>${when ? `<span class="cl-when">${when}</span>` : ''}<span class="note">${n} / ${it.checks.length}</span></summary>
       <div class="cl-sched">
-        <label>일정 <input class="in" type="text" readonly data-pick="range" placeholder="날짜·기간 선택" size="23" data-k="date" value="${rangeVal(it)}"></label>
+        <label>일정 <input class="in" type="text" readonly data-pick="range" placeholder="날짜·기간 선택" size="23" data-k="date" value="${rangeVal(dated(it))}"></label>
       </div>
       <ul class="cl-checks">${checks.map((c) => checkHtml(c)).join('')}</ul>
       <form class="cl-add"><input class="in" name="text" placeholder="할 일 추가" aria-label="추가할 할 일" maxlength="100"><button class="btn pill">추가</button></form>
@@ -118,11 +127,30 @@
     </details>`;
   }
 
+  // 시기가 시작하는 날: 예식일에서 months 개월·days 일 전. 그 달에 같은 날이 없으면 말일 (3.31 의 1개월 전 → 2.28)
+  const phaseStart = (wedding, months, days) => {
+    const [y, m, d] = wedding.split('-').map(Number);
+    const last = new Date(y, m - 1 - months + 1, 0).getDate();
+    const t = new Date(y, m - 1 - months, Math.min(d, last) - days);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  };
+
+  // 날짜를 정한 항목은 그 날짜가 들어가는 시기에 보여 줌 (저장된 phase 는 그대로라 날짜를 지우면 원래 자리로).
+  // D-12개월보다 이르면 D-12개월, 예식일 뒤면 D-DAY. 예식일이 없으면 원래 시기
+  const phaseFor = (it, starts) => {
+    const d = state.wedding && dateOf(it);
+    if (!d) return it.phase;
+    return (starts.findLast(([, s]) => s <= d) || starts[0])[0];
+  };
+
   function renderItems() {
-    const phases = [...new Set(state.items.map((it) => it.phase))];
-    return phases.map((p) => {
-      const items = state.items.filter((it) => it.phase === p);
-      return `<section class="cl-phase"><h2>${esc(p)}</h2>${items.map((it) => itemHtml(it, false)).join('')}</section>`;
+    const starts = state.wedding ? DEFAULT_PHASES.map(([p, months, days]) => [p, phaseStart(state.wedding, months, days)]) : [];
+    const groups = new Map(DEFAULT_PHASES.map(([p]) => [p, []]));
+    state.items.forEach((it) => { const p = phaseFor(it, starts); groups.set(p, [...(groups.get(p) || []), it]); });
+    const startOf = new Map(starts);
+    return [...groups].filter(([, items]) => items.length).map(([p, items]) => {
+      const start = startOf.has(p) ? `<small>${fmt(startOf.get(p)).slice(2)}</small>` : '';
+      return `<section class="cl-phase"><h2>${esc(p)}${start}</h2>${items.map((it) => itemHtml(it, false)).join('')}</section>`;
     }).join('');
   }
 
@@ -159,6 +187,13 @@
   // 계정에 저장된 체크리스트 (account.js 가 로그인 확인 뒤 부름)
   window.checklistSync = {
     get: () => state,
+    // 마이페이지에서 결혼 예정 날짜를 고치면 예식일도 같이 (account.js)
+    setWedding: (d) => {
+      if (state.wedding === d) return;
+      state.wedding = d;
+      save();
+      if (document.body.dataset.view === 'checklist') window.renderChecklist();
+    },
     set: (s) => {
       state = current(s);
       store();
@@ -167,8 +202,8 @@
   };
 
   window.renderChecklist = () => {
-    // 예식일을 아직 안 정했으면 마이페이지에 적은 결혼 예정 날짜로 (profile 은 account.js)
-    if (!state.wedding && typeof profile !== 'undefined' && profile?.wedding_date) state.wedding = profile.wedding_date;
+    // 로그인했고 마이페이지에 결혼 예정 날짜가 있으면 그게 기준 (profile 은 account.js). 예식일을 고치면 거기도 저장됨
+    if (typeof profile !== 'undefined' && profile?.wedding_date) state.wedding = profile.wedding_date;
     renderHero();
     renderList();
   };
@@ -176,6 +211,7 @@
   $('cl-wedding').addEventListener('change', (e) => {
     state.wedding = e.target.value;
     save();
+    window.saveWeddingDate?.(state.wedding); // account.js. 로그인했으면 마이페이지 결혼 예정 날짜도 같이
     window.renderChecklist();
   });
   $('cl-hide-done').addEventListener('change', (e) => { hideDone = e.target.checked; renderList(); });
@@ -191,6 +227,8 @@
     if (e.target.dataset.k === 'date') {
       const it = byId(e.target.closest('.cl-item').dataset.id);
       [it.date, it.end = ''] = e.target.value.split(' ~ ');
+      if (it.title === SHOOT_TITLE && it.date && window.shootDate?.() !== it.date
+        && confirm(`웨딩촬영 시안에서도 촬영 날짜를 ${fmt(it.date)}로 수정할까요?`)) window.setShootDate(it.date);
       return changed(e.target);
     }
     const li = e.target.closest('[data-cid]');

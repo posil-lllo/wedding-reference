@@ -145,7 +145,7 @@ async function syncChecklist() {
   if (!user || !sync) return;
   const local = sync.get();
   const remote = await backend.checklist();
-  if (remote && (remote.at || 0) > (local.at || 0)) sync.set(remote);
+  if (remote && (remote.at || 0) > (local.at || 0)) { sync.set(remote); refreshDates(); }
   else if ((local.at || 0) > (remote?.at || 0)) await backend.putChecklist(user.id, local);
 }
 // mbti/app.js 가 테스트를 끝낸 순간 부름. 카카오 로그인한 사람만 저장 (익명·비로그인은 user 가 null)
@@ -276,6 +276,7 @@ const JOIN_CARD = `<article class="dcard">
 // app.js 의 show('my') 가 부름
 async function renderMyPage() {
   const [list, invited] = await Promise.all([backend.list(), backend.invitedList()]);
+  setDraftDates(list); // 삭제·이름 변경 뒤에도 여기를 지남
   const covers = await backend.signedUrls([...new Set([...list, ...invited].map((d) => photoPaths(d.data)[0]).filter(Boolean))]);
   document.getElementById('my-avatar').innerHTML = user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : DEFAULT_AVATAR;
   showProfile();
@@ -586,6 +587,7 @@ async function logout() {
   }
   user = null;
   profile = null;
+  draftDates = [];
   setDraftId(null);
   renderAuth();
   setStatus('');
@@ -624,8 +626,30 @@ const showProfile = () => {
   document.getElementById('my-name').textContent = profile?.nickname || user.name;
   document.getElementById('my-date').textContent = weddingText();
 };
+// 계정의 모든 시안 촬영일 (홈 내 일정·체크리스트가 읽음). 지금 연 시안은 home-cal.js 가 화면 값으로 덮어씀
+let draftDates = [];
+window.draftShoots = () => draftDates;
+const setDraftDates = (list) => {
+  draftDates = list.map((d) => ({ id: d.id, name: d.name, date: d.data?.basic?.date || '' }));
+  refreshDates();
+};
+// 예식일·촬영일이 보이는 화면(홈 내 일정, 체크리스트)을 지금 값으로 다시 그림
+const refreshDates = () => {
+  const v = document.body.dataset.view;
+  if (v === 'home') window.renderHomeCal?.();
+  if (v === 'checklist') window.renderChecklist?.();
+};
+// 체크리스트에서 예식일을 고치면 결혼 예정 날짜도 그 날로 (정확한 날짜라 오차 0). 프로필이 아직 없으면 체크리스트에만 둠
+window.saveWeddingDate = (d) => {
+  if (!user || !profile || (profile.wedding_date || '') === d) return;
+  sb.from('profiles').update({ wedding_date: d || null, wedding_date_range: d ? 0 : null }).eq('user_id', user.id)
+    .select('nickname,role,character,wedding_date,wedding_date_range').single()
+    .then((r) => { profile = must(r); showProfile(); })
+    .catch((e) => console.error('wedding date save failed', e));
+};
 async function ensureProfile(ask) {
   profile = must(await sb.from('profiles').select('nickname,role,character,wedding_date,wedding_date_range').maybeSingle());
+  refreshDates();
   if (profile?.nickname && profile.role) return showProfile();
   if (ask) openProfile('onboard');
 }
@@ -669,6 +693,8 @@ profileForm.addEventListener('submit', async (e) => {
     }).select('nickname,role,character,wedding_date,wedding_date_range').single());
     profileDlg.close();
     showProfile();
+    window.checklistSync?.setWedding(profile.wedding_date || '');
+    refreshDates();
     track(profileDlg.dataset.mode === 'onboard' ? 'profile_done' : 'profile_edit', { role });
   } catch (err) {
     if (err.code === '23505') { // 닉네임 unique 위반
@@ -714,6 +740,8 @@ profileForm.addEventListener('submit', async (e) => {
     console.error('auth init failed', e);
     setStatus('로그인 상태를 확인하지 못했어요', true);
   }
+  refreshDates(); // 계정에서 불러온 시안의 촬영일
+  if (user) backend.list().then(setDraftDates).catch((e) => console.error('draft dates load failed', e));
   // 로그인 직후에만, 닉네임·신랑신부가 비어 있으면 입력 창. 실패해도 다른 기능은 그대로 씀
   if (user) ensureProfile(justLoggedIn).catch((e) => console.error('profile load failed', e));
   syncChecklist().catch((e) => { console.error('checklist load failed', e); clSyncErr(true); });
