@@ -71,12 +71,17 @@ const toUser = (session) => {
   return { id: session.user.id, name: m.name || m.full_name || m.nickname || '이름 없음', avatar: m.avatar_url || m.picture };
 };
 
+const RELOGIN_FLAG = 'wr-logged-out'; // 로그아웃 후 카카오 재로그인
 const backend = {
   session: async () => toUser(must(await sb.auth.getSession()).session),
   // 카카오 로그인 페이지로 이동했다가 이 주소로 돌아옴
   login: async () => must(await sb.auth.signInWithOAuth({
     provider: 'kakao',
-    options: { redirectTo: location.origin + location.pathname, scopes: 'profile_nickname profile_image' },
+    options: {
+      redirectTo: location.origin + location.pathname,
+      scopes: 'profile_nickname profile_image',
+      ...(localStorage.getItem(RELOGIN_FLAG) && { queryParams: { prompt: 'login' } }),
+    },
   })),
   logout: async () => {
     const { error } = await sb.auth.signOut();
@@ -472,13 +477,17 @@ async function openDraft(d, view = 'edit') {
   loadIntoEditor(data, view);
 }
 
-// 메뉴를 여는 아이콘 바로 아래, 오른쪽 끝을 맞춰 드롭다운처럼
+// 메뉴를 여는 아이콘 바로 아래(자리가 없으면 위), 오른쪽 끝을 맞춰 드롭다운처럼
 // 마이페이지 시안 카드 메뉴는 나중에 그려지므로 document 에서 capture 로 받음 (beforetoggle 은 버블링되지 않음)
 document.addEventListener('beforetoggle', (e) => {
   const menu = e.target;
   if (e.newState !== 'open' || !menu.classList?.contains('my-menu')) return;
   const r = document.querySelector(`[popovertarget="${menu.id}"]`).getBoundingClientRect();
-  menu.style.top = `${r.bottom + 6}px`;
+  menu.style.display = 'flex'; // 열리기 전 높이 재기
+  const h = menu.offsetHeight;
+  menu.style.display = '';
+  const below = r.bottom + 6 + h <= innerHeight - 8;
+  menu.style.top = `${below ? r.bottom + 6 : Math.max(8, r.top - 6 - h)}px`;
   if (menu.classList.contains('main-menu')) menu.style.left = `${Math.max(8, r.left)}px`; // 왼쪽 햄버거 메뉴
   else menu.style.right = `${Math.max(8, innerWidth - r.right)}px`;
 }, true);
@@ -596,11 +605,12 @@ async function logout() {
   user = null;
   profile = null;
   draftDates = [];
+  localStorage.setItem(RELOGIN_FLAG, '1');
   setDraftId(null);
   renderAuth();
   setStatus('');
   sessionStorage.setItem(ASKED_FLAG, '1'); // 방금 로그아웃한 사람에게는 다시 권하지 않음
-  show('edit');
+  show('home');
 }
 
 // ── 프로필: 로그인한 직후 닉네임이나 신랑·신부가 비어 있으면 받음 (신규·기존 사용자 모두) ──
@@ -749,6 +759,7 @@ profileForm.addEventListener('submit', async (e) => {
     setStatus('로그인 상태를 확인하지 못했어요', true);
   }
   authChecked = true;
+  if (user) localStorage.removeItem(RELOGIN_FLAG);
   renderAuth(); // 로그인 확인이 끝났으니 비로그인 안내(guest)를 켤 수 있음
   refreshDates(); // 계정에서 불러온 시안의 촬영일
   if (user) backend.list().then(setDraftDates).catch((e) => console.error('draft dates load failed', e));

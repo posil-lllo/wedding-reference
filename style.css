@@ -382,6 +382,8 @@ html { scroll-behavior: smooth; scrollbar-gutter: stable; } /* 스크롤바 유�
 .hc-d { flex: none; min-width: 76px; font-size: 13px; color: var(--sub2); }
 .hc-t { display: flex; flex-direction: column; gap: 2px; }
 .hc-empty { margin: 0; padding: 10px 8px; }
+/* 비로그인 안내는 오른쪽 칸에서 세로 가운데 (달력 높이만큼 늘림) */
+body.guest .hc-body > :last-child { align-self: stretch; display: flex; align-items: center; }
 .hc-next { margin: 0 0 4px; padding: 0 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .hc-list + .hc-next, .hc-empty + .hc-next { margin-top: 20px; }
 @media (max-width: 640px) { .hc-body { grid-template-columns: 1fr; gap: 8px; } .home-cal { padding: 16px; } }
