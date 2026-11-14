@@ -365,8 +365,10 @@ html { scroll-behavior: smooth; scrollbar-gutter: stable; } /* 스크롤바 유�
 .home-cal .cal-g span { position: relative; display: grid; place-items: center; aspect-ratio: 1; }
 .home-cal .cal-g .today { font-weight: 700; }
 .home-cal .cal-g .today::before { content: ''; position: absolute; inset: 0; max-width: 34px; max-height: 34px; margin: auto; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--accent); }
-.home-cal .cal-g.days > .hol { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; color: #d0675c; }
-.home-cal .cal-g .hol small { font-size: 8px; line-height: 1; letter-spacing: -0.3px; white-space: nowrap; }
+/* 공휴일 이름 (홈 달력·날짜 팝업, datepick.js holidayOf) */
+.cal-g.days > .hol { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+.cal-g.days > .hol:not([aria-pressed="true"], :disabled) { color: #d0675c; }
+.cal-g.days > .hol small { font-size: 8px; font-weight: 400; line-height: 1; letter-spacing: -0.3px; white-space: nowrap; }
 .home-cal .cal-g b { position: absolute; bottom: 3px; display: flex; gap: 2px; }
 .home-cal em { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex: none; }
 .home-cal em.wedding { background: #d0675c; }

@@ -8,15 +8,6 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const now = new Date();
   let view = { y: now.getFullYear(), m: now.getMonth() };
-  // 공휴일. 양력은 고정, 설날·추석(앞뒤 하루 포함)·부처님오신날은 브라우저 내장 단기(음력) 달력으로 계산
-  // ponytail: 대체공휴일·선거일은 안 넣음. 필요하면 공공데이터포털 특일 정보 API 로
-  const SOLAR = { '01-01': '신정', '03-01': '삼일절', '05-05': '어린이날', '06-06': '현충일', '08-15': '광복절', '10-03': '개천절', '10-09': '한글날', '12-25': '성탄절' };
-  const LUNAR = { '1-1': '설날', '8-15': '추석' };
-  const lunarFmt = new Intl.DateTimeFormat('ko-KR-u-ca-dangi', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Seoul' });
-  const lunarOf = (y, m, d) => { const p = lunarFmt.formatToParts(new Date(Date.UTC(y, m, d, 3))); return `${p.find((x) => x.type === 'month').value}-${p.find((x) => x.type === 'day').value}`; };
-  const holidayOf = (y, m, d) => SOLAR[`${pad(m + 1)}-${pad(d)}`]
-    || (lunarOf(y, m, d) === '4-8' && '부처님오신날')
-    || [0, 1, -1].map((k) => LUNAR[lunarOf(y, m, d + k)]).find(Boolean) || '';
   let mode = 'day'; // day / year / month. 제목을 누르면 연도 → 달 순으로 골라 이동 (시안 날짜 팝업과 같은 방식)
 
   // 촬영 날짜: 지금 연 시안(app.js state, 저장 전 값까지)과 계정의 다른 시안들(account.js draftShoots). 시안 이름·시간은 안 붙임

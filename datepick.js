@@ -3,6 +3,15 @@
 const chev = (d) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
 const CHEV_L = chev('M15 6l-6 6 6 6');
 const CHEV_R = chev('M9 6l6 6-6 6');
+// 공휴일 이름 (홈 달력·날짜 팝업 공용). 양력은 고정, 설날·추석(앞뒤 하루 포함)·부처님오신날은 브라우저 내장 단기(음력) 달력으로 계산
+// ponytail: 대체공휴일·선거일은 안 넣음. 필요하면 공공데이터포털 특일 정보 API 로
+const SOLAR = { '01-01': '신정', '03-01': '삼일절', '05-05': '어린이날', '06-06': '현충일', '08-15': '광복절', '10-03': '개천절', '10-09': '한글날', '12-25': '성탄절' };
+const LUNAR = { '1-1': '설날', '8-15': '추석' };
+const lunarFmt = new Intl.DateTimeFormat('ko-KR-u-ca-dangi', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Seoul' });
+const lunarOf = (y, m, d) => { const p = lunarFmt.formatToParts(new Date(Date.UTC(y, m, d, 3))); return `${p.find((x) => x.type === 'month').value}-${p.find((x) => x.type === 'day').value}`; };
+const holidayOf = (y, m, d) => SOLAR[`${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`]
+  || (lunarOf(y, m, d) === '4-8' && '부처님오신날')
+  || [0, 1, -1].map((k) => LUNAR[lunarOf(y, m, d + k)]).find(Boolean) || '';
 
 function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {}) {
   const WEEK = '일월화수목금토';
@@ -52,7 +61,8 @@ function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {})
         const v = isoOf(y, m, d);
         const cls = [v === today && 'today', from && v >= from && v <= to && 'in-range',
           v === from && 'range-start', v === to && 'range-end'].filter(Boolean).join(' ');
-        cells += cell(`data-d="${v}"`, d, { off: v < today, on: v === date, cls });
+        const hol = holidayOf(y, m, d);
+        cells += cell(`data-d="${v}"${hol ? ` title="${hol}"` : ''}`, hol ? `${d}<small>${hol}</small>` : d, { off: v < today, on: v === date, cls: [cls, hol && 'hol'].filter(Boolean).join(' ') });
       }
       const title = `<button type="button" class="cal-t" data-mode="year">${y}년 ${m + 1}월</button>`;
       return head(title, 1, '달', y * 12 + m <= thisYear * 12 + thisMonth) + `<div class="cal-g days">${cells}</div>`;
@@ -168,12 +178,13 @@ function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {})
       for (let d = 1, last = new Date(y, m + 1, 0).getDate(); d <= last; d++) {
         const v = isoOf(y, m, d);
         const cls = [v === today && 'today', a !== b && v >= a && v <= b && 'in-range', a !== b && v === a && 'range-start', a !== b && v === b && 'range-end'];
-        cells += btn(`data-d="${v}"`, d, v === a || v === b, cls.filter(Boolean).join(' '));
+        const hol = holidayOf(y, m, d);
+        cells += btn(`data-d="${v}"${hol ? ` title="${hol}"` : ''}`, hol ? `${d}<small>${hol}</small>` : d, v === a || v === b, [...cls, hol && 'hol'].filter(Boolean).join(' '));
       }
       return head(`<button type="button" class="cal-t" data-mode="year">${y}년 ${m + 1}월</button>`, 1, '달')
         + `<div class="cal-g days">${cells}</div>`
-        + (isRange ? `<p class="cal-l" aria-live="polite">${from ? '끝나는 날을 고르세요. 하루면 같은 날을 한 번 더' : '시작하는 날을 고르세요'}</p>` : '')
-        + foot('<button type="button" class="cal-x" data-d="">지우기</button>', `<button type="button" class="cal-x" data-d="${today}">오늘</button>`);
+        + (isRange ? `<p class="cal-l" aria-live="polite">${from ? '종료 날짜를 고르세요. 하루만이면 확인을 누르세요' : '기간이면 시작 날짜와 종료 날짜를 차례로 고르세요'}</p>` : '')
+        + foot('<button type="button" class="cal-x" data-d="">초기화</button>', '<button type="button" class="cal-x cal-ok" data-close>확인</button>');
     },
     year: ({ y }) => {
       const start = y - (((y % 12) + 12) % 12);
@@ -194,7 +205,7 @@ function datePicker(btn, panel, { onToggle = () => {}, onDone = () => {} } = {})
         + `<div class="cal-ap" role="group" aria-label="오전 오후">${ampm}</div>`
         + `<p class="cal-l">시</p><div class="cal-g quad">${hours}</div>`
         + `<p class="cal-l">분</p><div class="cal-g quad">${mins}</div>`
-        + foot('<button type="button" class="cal-x" data-clear>지우기</button>', '<button type="button" class="cal-x cal-ok" data-close>완료</button>');
+        + foot('<button type="button" class="cal-x" data-clear>초기화</button>', '<button type="button" class="cal-x cal-ok" data-close>완료</button>');
     },
   };
   const render = (focus) => {

@@ -12,13 +12,16 @@
   const fmt = (iso) => iso.replaceAll('-', '.');
 
   // 기본 할 일을 나중에 바꾸면 여기에 한 줄 추가. 이미 쓰던 체크리스트에 한 번만 반영 (state.v 로 기록해 지운 할 일을 되살리지 않음)
-  // rename: 기존 할 일 이름 → 새 이름 (메모가 비어 있으면 기본 메모도 채움) · add: 항목 제목 → 없으면 덧붙일 할 일 · remove: 뺄 할 일 이름 · title: 항목 제목 → 새 제목
+  // rename: 기존 할 일 이름 → 새 이름 (메모가 비어 있으면 기본 메모도 채움) · add: 항목 제목 → 없으면 덧붙일 할 일 · remove: 뺄 할 일 이름 · title: 항목 제목 → 새 제목 · dropTips: 뺄 기본 메모 줄
   const UPGRADES = [
     { rename: { '헬퍼비·수고비 현금 봉투 준비': '사례비 봉투 준비' },
       add: { 결혼식: ['결혼반지', '가방순이용 식권', '청심환', '신랑 긴양말', '아빠들 긴양말', '2부 의상', '포토테이블 사진', '사례비 봉투 챙기기', '식권'] } },
     { remove: ['체크리스트 확인하며 준비하기'] },
-    { split: { '스튜디오·드레스·메이크업(스드메) 계약': ['스튜디오 계약', '드레스샵 계약', '메이크업샵 계약'] } },
+    { split: { '스튜디오·드레스·메이크업(스드메) 계약': ['스튜디오 선택', '드레스샵 투어 예약', '메이크업샵 선택'] } },
     { title: { '스튜디오 웨딩촬영': '웨딩촬영' } },
+    { dropTips: ['원하는 사진을 캡처해 당일 작가님께 보여주기. PPT로 만들어가는 커플도 많음'] },
+    { title: { '스튜디오 계약': '스튜디오 선택', '드레스샵 계약': '드레스샵 투어 예약', '메이크업샵 계약': '메이크업샵 선택' } },
+    { remove: ['드레스 투어 예약', '드레스 투어 동행인 섭외', '드레스샵 선택', '메이크업샵 선택'], add: { '드레스샵 투어 예약': ['드레스 투어 동행인 섭외'] } },
   ];
   const defaultMemo = new Map(DEFAULT_PHASES.flatMap(([, , , items]) => items.flatMap(([, checks]) => checks.map((c) => [].concat(c)))));
   const newCheck = (text) => ({ id: uid(), text, memo: defaultMemo.get(text) || '', done: false });
@@ -29,10 +32,10 @@
     return titles.map((title, i) => ({ ...it, id: i ? uid() : it.id, title, tips: defaultItem.get(title).tips, checks: it.checks.filter((c) => owner(c) === title) }));
   };
   function upgrade(s) {
-    const items = UPGRADES.slice(s.v || 0).reduce((items, { rename = {}, add = {}, remove = [], split = {}, title = {} }) => items.flatMap((it) => (split[it.title] ? splitItem(it, split[it.title]) : [it])).map((it) => {
+    const items = UPGRADES.slice(s.v || 0).reduce((items, { rename = {}, add = {}, remove = [], split = {}, title = {}, dropTips = [] }) => items.flatMap((it) => (split[it.title] ? splitItem(it, split[it.title]) : [it])).map((it) => {
       const checks = it.checks.filter((c) => !remove.includes(c.text)).map((c) => (rename[c.text] ? { ...c, text: rename[c.text], memo: c.memo || defaultMemo.get(rename[c.text]) || '' } : c));
       const have = new Set(checks.map((c) => c.text));
-      return { ...it, title: title[it.title] || it.title, checks: [...checks, ...(add[it.title] || []).filter((t) => !have.has(t)).map(newCheck)] };
+      return { ...it, title: title[it.title] || it.title, tips: it.tips.filter((t) => !dropTips.includes(t)), checks: [...checks, ...(add[it.title] || []).filter((t) => !have.has(t)).map(newCheck)] };
     }), s.items);
     return { ...s, items, v: UPGRADES.length };
   }
